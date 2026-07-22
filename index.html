@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -25,6 +25,7 @@
     --line: #e2e7e5;
     --import: #d9632a;
     --font-display: 'Sora', -apple-system, sans-serif;
+    --font-serif: 'Playfair Display', Georgia, serif;
     --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
 }
@@ -44,103 +45,83 @@ body { padding: 20px; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: var(--ink);
-    color: #fff;
+    gap: 18px;
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--line);
     border-radius: 12px;
-    padding: 13px 22px;
+    padding: 12px 26px;
+    box-shadow: 0 1px 3px rgba(15,30,30,0.05);
 }
 
-.topbar-left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.topbar-left, .topbar-right-group { display: flex; align-items: center; flex-shrink: 0; }
 
-.gov-logo-box {
-    background: #fff;
-    border-radius: 8px;
-    padding: 5px 12px;
+.gov-logo-box img { height: 46px; width: auto; display: block; }
+
+.topbar-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex: 1;
+    min-width: 0;
+}
+.topbar-h1 {
+    font-family: var(--font-serif);
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.1px;
+    white-space: nowrap;
+}
+.topbar-h1 .accent { color: var(--teal); }
+.topbar-sub-row {
     display: flex;
     align-items: center;
-    flex-shrink: 0;
-    height: 34px;
-    box-sizing: border-box;
+    gap: 8px;
+    margin-top: 4px;
 }
-.gov-logo-box img { height: 100%; width: auto; display: block; }
-
-.topbar-divider {
-    width: 1px;
-    height: 30px;
-    background: rgba(255,255,255,0.16);
-    flex-shrink: 0;
+.topbar-sub {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.4px;
+}
+.topbar-badge {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    background: var(--teal-pale);
+    color: var(--teal-dark);
+    padding: 3px 9px;
+    border-radius: 20px;
+    letter-spacing: 0.6px;
 }
 
 .dima-lockup {
     display: flex;
     flex-direction: column;
-    line-height: 1.15;
-    flex-shrink: 0;
+    align-items: flex-end;
+    line-height: 1.1;
 }
 .dima-word {
     font-family: var(--font-display);
-    font-size: 16px;
+    font-size: 21px;
     font-weight: 800;
-    letter-spacing: 0.5px;
-    color: #fff;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #0d0d0d, #6f6f6f);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
 }
-.dima-word span { color: var(--teal); }
 .dima-sub {
     font-family: var(--font-mono);
-    font-size: 8.5px;
-    color: #9fb3b0;
+    font-size: 8px;
+    color: var(--muted);
     letter-spacing: 0.3px;
     margin-top: 2px;
     text-transform: uppercase;
-}
-
-.topbar-mark {
-    width: 26px;
-    height: 26px;
-    position: relative;
-    flex-shrink: 0;
-}
-.topbar-mark span {
-    position: absolute;
-    width: 9px;
-    height: 9px;
-    border: 1.6px solid var(--teal);
-}
-.topbar-mark span:nth-child(1) { top: 0; left: 0; border-right: none; border-bottom: none; }
-.topbar-mark span:nth-child(2) { top: 0; right: 0; border-left: none; border-bottom: none; }
-.topbar-mark span:nth-child(3) { bottom: 0; left: 0; border-right: none; border-top: none; }
-.topbar-mark span:nth-child(4) { bottom: 0; right: 0; border-left: none; border-top: none; }
-
-.topbar-title { display: flex; flex-direction: column; line-height: 1.2; }
-.topbar-title h1 {
-    font-family: var(--font-display);
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0.1px;
-}
-.topbar-title .topbar-sub {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    color: #9fb3b0;
-    letter-spacing: 0.4px;
-    margin-top: 2px;
-}
-
-.topbar-badge {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 600;
-    background: var(--teal);
-    color: #fff;
-    padding: 4px 9px;
-    border-radius: 20px;
-    letter-spacing: 0.6px;
-}
-
-.topbar-right {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: #9fb3b0;
+    text-align: right;
 }
 
 /* ===== Layout ===== */
@@ -449,11 +430,10 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 }
 
 @media (max-width: 640px) {
-    .topbar { flex-wrap: wrap; gap: 10px; }
-    .topbar-right { display: none; }
+    .topbar { flex-wrap: wrap; gap: 10px; padding: 12px 16px; }
+    .topbar-center { order: 3; flex-basis: 100%; }
+    .topbar-h1 { font-size: 17px; white-space: normal; }
     .dima-sub { display: none; }
-    .topbar-title { display: none; }
-    .topbar-badge { display: none; }
 }
 
     </style>
@@ -465,19 +445,20 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         <div class="gov-logo-box">
             <img src="logo_governo_pi.png" alt="Governo do Estado do Piauí - SEPLAN">
         </div>
-        <div class="topbar-divider"></div>
+    </div>
+    <div class="topbar-center">
+        <h1 class="topbar-h1"><span class="accent">Análise</span> de Impacto Populacional</h1>
+        <div class="topbar-sub-row">
+            <span class="topbar-sub">UF 22 · SIRGAS2000 · Censo IBGE 2022</span>
+            <span class="topbar-badge">Piauí</span>
+        </div>
+    </div>
+    <div class="topbar-right-group">
         <div class="dima-lockup">
-            <div class="dima-word">DIM<span>A</span></div>
+            <div class="dima-word">DIMA</div>
             <div class="dima-sub">Diretoria de Monitoramento de Ações</div>
         </div>
-        <div class="topbar-divider"></div>
-        <div class="topbar-title">
-            <h1>Análise de Impacto Populacional</h1>
-            <div class="topbar-sub">UF 22 · SIRGAS2000</div>
-        </div>
-        <span class="topbar-badge">Piauí</span>
     </div>
-    <div class="topbar-right">Censo IBGE 2022</div>
 </div>
 
 <div class="container">
