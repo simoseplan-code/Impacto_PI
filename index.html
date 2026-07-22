@@ -50,7 +50,49 @@ body { padding: 20px; }
     padding: 13px 22px;
 }
 
-.topbar-left { display: flex; align-items: center; gap: 12px; }
+.topbar-left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+.gov-logo-box {
+    background: #fff;
+    border-radius: 8px;
+    padding: 5px 12px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    height: 34px;
+    box-sizing: border-box;
+}
+.gov-logo-box img { height: 100%; width: auto; display: block; }
+
+.topbar-divider {
+    width: 1px;
+    height: 30px;
+    background: rgba(255,255,255,0.16);
+    flex-shrink: 0;
+}
+
+.dima-lockup {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+    flex-shrink: 0;
+}
+.dima-word {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #fff;
+}
+.dima-word span { color: var(--teal); }
+.dima-sub {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    color: #9fb3b0;
+    letter-spacing: 0.3px;
+    margin-top: 2px;
+    text-transform: uppercase;
+}
 
 .topbar-mark {
     width: 26px;
@@ -406,13 +448,29 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     .filter-grid { grid-template-columns: 1fr; }
 }
 
+@media (max-width: 640px) {
+    .topbar { flex-wrap: wrap; gap: 10px; }
+    .topbar-right { display: none; }
+    .dima-sub { display: none; }
+    .topbar-title { display: none; }
+    .topbar-badge { display: none; }
+}
+
     </style>
 </head>
 <body>
 
 <div class="topbar">
     <div class="topbar-left">
-        <div class="topbar-mark"><span></span><span></span><span></span><span></span></div>
+        <div class="gov-logo-box">
+            <img src="logo_governo_pi.png" alt="Governo do Estado do Piauí - SEPLAN">
+        </div>
+        <div class="topbar-divider"></div>
+        <div class="dima-lockup">
+            <div class="dima-word">DIM<span>A</span></div>
+            <div class="dima-sub">Diretoria de Monitoramento de Ações</div>
+        </div>
+        <div class="topbar-divider"></div>
         <div class="topbar-title">
             <h1>Análise de Impacto Populacional</h1>
             <div class="topbar-sub">UF 22 · SIRGAS2000</div>
@@ -1419,11 +1477,14 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         if (demografia && demografia.totalGeral > 0) {
             const pctH = (demografia.totalHomens / demografia.totalGeral * 100).toFixed(2);
             const pctM = (demografia.totalMulheres / demografia.totalGeral * 100).toFixed(2);
-            const g = demografia.grupos;
-            const p0 = (g[0].pop / demografia.totalGeral * 100).toFixed(2);
-            const p1 = (g[1].pop / demografia.totalGeral * 100).toFixed(2);
-            const p2 = (g[2].pop / demografia.totalGeral * 100).toFixed(2);
-            txt += `Do total impactado, estima-se que <strong>${pctH}% sejam homens</strong> e <strong>${pctM}% mulheres</strong>; por idade, ${p0}% têm de 0 a 14 anos, ${p1}% de 15 a 64 anos, e ${p2}% têm 65 anos ou mais.`;
+            let maxIdx = 0, maxPop = -1;
+            AGE_BINS.forEach((bin, i) => {
+                const pop = demografia.homens[i] + demografia.mulheres[i];
+                if (pop > maxPop) { maxPop = pop; maxIdx = i; }
+            });
+            const pctFaixaMax = (maxPop / demografia.totalGeral * 100).toFixed(2);
+            const faixaMaxLabel = AGE_BINS[maxIdx].label;
+            txt += `Do total impactado, estima-se que <strong>${pctH}% sejam homens</strong> e <strong>${pctM}% mulheres</strong>; a faixa etária mais numerosa é <strong>${faixaMaxLabel}</strong> (${pctFaixaMax}% do total).`;
         }
         return txt.trim();
     }

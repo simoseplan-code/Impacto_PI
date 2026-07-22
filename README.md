@@ -15,6 +15,7 @@ Ferramenta web (HTML + JS, sem backend) para estimar a população atingida em u
 - `piaui_demografia_setor.js` — população exata por sexo e 11 faixas etárias, por setor censitário (Censo 2022, Agregados por Setores - Demografia). **Idem.**
 - `piaui_demografia_bairro.js` — o mesmo, agregado por bairro (soma dos setores que compõem cada bairro). **Idem.**
 - `piaui_demografia_municipio_exata.js` — o mesmo, agregado por município (soma de todos os setores do município). **Idem.**
+- `logo_governo_pi.png` — logo oficial do Governo do Estado do Piauí/SEPLAN, usada no cabeçalho. **Idem.**
 
 ## Como usar localmente
 
