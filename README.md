@@ -5,7 +5,7 @@ Ferramenta web (HTML + JS, sem backend) para estimar a população atingida em u
 ## Arquivos
 
 - `index.html` — aplicação completa (mapa, interface e lógica).
-- `piaui_data.js` — setores censitários (GeoJSON). **Precisa estar na mesma pasta que o `index.html`.**
+- `piaui_data.js` — setores censitários (GeoJSON), com população, área e situação urbana/rural (`SIT`). **Precisa estar na mesma pasta que o `index.html`.**
 - `piaui_bairros.js` — bairros (GeoJSON). **Idem.**
 - `piaui_municipios.js` — municípios (GeoJSON). **Idem.**
 - `piaui_demografia.js` — perfil de cada município por sexo e idade (Censo 2022, Tabela 9514/SIDRA). **Idem.**
@@ -53,6 +53,18 @@ O painel **"Filtros de sexo e idade"** (na parte de baixo da configuração, dep
 - **Faixa etária**: 11 faixas do Censo (0–4, 5–9, 10–14, 15–19, 20–24, 25–29, 30–39, 40–49, 50–59, 60–69, 70+). Botões "marcar todas" / "limpar" facilitam selecionar em bloco. Pelo menos uma caixa de cada grupo fica sempre marcada.
 
 Os valores no card de resultado, na tabela de unidades e no PDF exportado refletem as caixas marcadas. **O dado agora é exato em qualquer base** (Setor, Bairro ou Município) — vem direto do Censo 2022 (IBGE, Agregados por Setores - Demografia), não é mais estimado por percentual de município. Setor é a fonte original; Bairro e Município são a soma exata dos setores que os compõem.
+
+## Filtro urbano / rural (modo raio/buffer e Por município)
+
+Um problema comum: um setor urbano grande é só "tocado de raspão" pela borda do raio, mas entra na conta inteiro (principalmente no método "Unidade tocada"), inflando o número final. O painel **"Área urbana / rural"** (visível nos modos "Raio/buffer" e "Por município") resolve isso:
+
+- Duas caixas de seleção: **Urbana** e **Rural** (ambas marcadas = sem filtro, padrão).
+- Desmarque **Urbana** pra descontar completamente os setores urbanos da soma — sobra só a população dos setores rurais, e vice-versa.
+- Baseado no campo oficial `SITUACAO` do IBGE (malha de setores censitários — `PI_setores_CD2022.shp`), já embutido no `piaui_data.js` como `SIT` ('U'/'R'). Setores sem essa classificação (poucos casos residuais da malha) nunca são excluídos, por segurança.
+- **No modo raio/buffer**: funciona na base Setor censitário e no método "Por domicílios" (que sempre opera em granularidade de setor). Não tem efeito nas bases Bairro/Município nesse modo.
+- **No modo "Por município"**: quando o filtro está ativo, o app soma só os setores do município escolhido que batem com a situação marcada (população, área, perfil demográfico e domicílios recalculados na hora a partir dos setores) — em vez do dado oficial agregado do município inteiro. Sem filtro, continua usando o dado oficial exato do IBGE.
+- Ao contrário dos filtros de sexo/idade, mudar esse filtro **recalcula a análise inteira** (não é só um re-corte do resultado em cache), porque muda quais setores entram na soma.
+- O resumo da análise e o PDF exportado mostram o filtro aplicado, quantos setores foram descartados, e a área correspondente só aos setores incluídos.
 
 ## Métodos de contagem (modo raio/buffer)
 

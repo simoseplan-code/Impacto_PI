@@ -486,6 +486,15 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             </div>
         </div>
 
+        <div class="panel" id="situacaoPanel">
+            <div class="panel-head"><span class="panel-tick"></span><h2>Área urbana / rural</h2></div>
+            <div class="pill-check-group" id="situacaoCheckboxes">
+                <label class="pill-check checked"><input type="checkbox" value="urbano" checked> Urbana</label>
+                <label class="pill-check checked"><input type="checkbox" value="rural" checked> Rural</label>
+            </div>
+            <div class="hint" id="situacaoHint" style="margin-top:8px;">Desmarque "Urbana" pra desconsiderar setores urbanos — evita inflar o número quando uma cidade grande encosta na borda do buffer (ou faz parte do município selecionado). Baseado na classificação oficial do IBGE por setor censitário.</div>
+        </div>
+
         <div id="bufferControls">
             <div class="panel">
                 <div class="panel-head"><span class="panel-tick"></span><h2>Local de análise</h2></div>
@@ -518,15 +527,6 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
                     <label class="segmented-option"><input type="radio" name="countMethodRadio" value="domicilios"> Por domicílios</label>
                 </div>
                 <div class="demog-note" id="domiciliosMethodNote" style="display:none; margin-top:8px;">Este método sempre usa granularidade de setor censitário (onde está a média de moradores/domicílio do Censo), independente da base selecionada acima.</div>
-            </div>
-
-            <div class="panel" id="situacaoPanel">
-                <div class="panel-head"><span class="panel-tick"></span><h2>Área urbana / rural</h2></div>
-                <div class="pill-check-group" id="situacaoCheckboxes">
-                    <label class="pill-check checked"><input type="checkbox" value="urbano" checked> Urbana</label>
-                    <label class="pill-check checked"><input type="checkbox" value="rural" checked> Rural</label>
-                </div>
-                <div class="hint" style="margin-top:8px;">Desmarque "Urbana" pra desconsiderar setores urbanos que o raio só toca de raspão — evita inflar o número quando uma cidade grande encosta na borda do buffer. Funciona na base Setor censitário e no método "Por domicílios".</div>
             </div>
         </div>
 
@@ -1789,7 +1789,13 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     wirePillCheckboxGroup('faixaCheckboxes', selectedFaixas);
     // Situação (urbano/rural) muda quais setores entram na conta — precisa
     // recalcular a geometria de novo, não só re-exibir com dado em cache.
-    wirePillCheckboxGroup('situacaoCheckboxes', selectedSituacao, () => recomputeCurrentAnalysis());
+    wirePillCheckboxGroup('situacaoCheckboxes', selectedSituacao, () => {
+        if (analysisMode === 'municipio' && selectedMunicipioCode) {
+            renderMunicipioResult(selectedMunicipioCode);
+        } else {
+            recomputeCurrentAnalysis();
+        }
+    });
 
     document.getElementById('faixaMarcarTodas').addEventListener('click', () => {
         const container = document.getElementById('faixaCheckboxes');
@@ -2014,24 +2020,54 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         if (!feature) return;
 
         const props = feature.properties;
-        const totalPop = props.POP_TOTAL || 0;
-        const areaKm2 = props.AREA_KM2 || 0;
+        const filtroSituacaoAtivo = (selectedSituacao.size < 2) && (typeof PIAUI_GEOJSON !== 'undefined');
 
-        // Domicílios: contagem exata por município (COD_MUN do Censo), não teste de polígono
-        const domRec = (typeof PIAUI_DOMICILIOS_MUNICIPIO !== 'undefined') ? PIAUI_DOMICILIOS_MUNICIPIO[codMun] : null;
-        const domParticular = domRec ? domRec[0] : 0;
-        const domColetivo = domRec ? domRec[1] : 0;
-        lastDomiciliosCache = domRec ? { particular: domParticular, coletivo: domColetivo, total: domParticular + domColetivo } : null;
+        let totalPop, areaKm2, demografia, domParticular, domColetivo, excluidosPorSituacao = 0;
+        let setoresFiltrados = null;
+
+        if (!filtroSituacaoAtivo) {
+            // Caminho padrão: dado oficial exato do município inteiro
+            totalPop = props.POP_TOTAL || 0;
+            areaKm2 = props.AREA_KM2 || 0;
+            demografia = computeDemografia([{ codigo: codMun, pop: totalPop }], 'municipio');
+            const domRec = (typeof PIAUI_DOMICILIOS_MUNICIPIO !== 'undefined') ? PIAUI_DOMICILIOS_MUNICIPIO[codMun] : null;
+            domParticular = domRec ? domRec[0] : 0;
+            domColetivo = domRec ? domRec[1] : 0;
+        } else {
+            // Filtro urbano/rural ativo: soma só os setores do município que passam no filtro
+            const todosSetores = PIAUI_GEOJSON.features.filter(f => f.properties.CD_SETOR.startsWith(codMun));
+            setoresFiltrados = todosSetores.filter(f => passaFiltroSituacao(f.properties.SIT));
+            excluidosPorSituacao = todosSetores.length - setoresFiltrados.length;
+
+            totalPop = setoresFiltrados.reduce((s, f) => s + (f.properties.POP_TOTAL || 0), 0);
+            areaKm2 = setoresFiltrados.reduce((s, f) => s + (f.properties.AREA_KM2 || 0), 0);
+
+            const unitsParaDemog = setoresFiltrados.map(f => ({ codigo: f.properties.CD_SETOR, pop: f.properties.POP_TOTAL || 0 }));
+            demografia = computeDemografia(unitsParaDemog, 'setor');
+
+            if (setoresFiltrados.length) {
+                const geometries = setoresFiltrados.map(f => f.geometry);
+                const bbox = getGeometriesBBox(geometries);
+                domParticular = countPointsInGeometries(getPontosParticular(), geometries, bbox);
+                domColetivo = countPointsInGeometries(getPontosColetivo(), geometries, bbox);
+            } else {
+                domParticular = 0; domColetivo = 0;
+            }
+        }
+
+        lastDomiciliosCache = { particular: domParticular, coletivo: domColetivo, total: domParticular + domColetivo };
         const avgMoradores = domParticular > 0 ? (totalPop / domParticular) : null;
 
-        // Zona no mapa: destaca o polígono do município selecionado
+        // Zona no mapa: destaca o polígono do município (ou só os setores filtrados, quando o filtro está ativo)
         zoneLayerGroup.clearLayers();
-        const muniLayer = L.geoJSON(feature, { style: ZONE_STYLE }).addTo(zoneLayerGroup);
+        const geomParaMapa = filtroSituacaoAtivo
+            ? { type: 'FeatureCollection', features: setoresFiltrados }
+            : feature;
+        const muniLayer = L.geoJSON(geomParaMapa, { style: ZONE_STYLE }).addTo(zoneLayerGroup);
         map.fitBounds(muniLayer.getBounds(), { padding: [40, 40] });
         setMode('Município inteiro');
         document.getElementById('radiusDisplay').textContent = '—';
 
-        const demografia = computeDemografia([{ codigo: codMun, pop: totalPop }], 'municipio');
         const isFiltered = isFilterActive();
         const hasDem = demografia && demografia.totalGeral > 0;
         const displayPop = hasDem ? getFilteredValue(demografia, selectedSexos, selectedFaixas) : totalPop;
@@ -2050,8 +2086,8 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 
         renderDemografiaBlock(demografia);
 
-        // Área: mostra a área do município inteiro (não há "área coberta" separada aqui)
-        document.getElementById('areaZoneLabel').textContent = 'Área do município:';
+        // Área: mostra a área do município (ou só a área dos setores filtrados)
+        document.getElementById('areaZoneLabel').textContent = filtroSituacaoAtivo ? 'Área filtrada (urbano/rural):' : 'Área do município:';
         document.getElementById('areaZoneDisplay').textContent = fmtArea(areaKm2 * 1e6);
         document.getElementById('areaZoneRow').style.display = 'flex';
         document.getElementById('areaCoveredRow').style.display = 'none';
@@ -2077,7 +2113,8 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             dominante: props.NM_MUN,
             extraDetailText: `Dados do município de <strong>${props.NM_MUN}</strong> (${fmtArea(areaKm2 * 1e6)}).`,
             countMethod: null,
-            domicilios: lastDomiciliosCache
+            domicilios: lastDomiciliosCache,
+            excluidosPorSituacao
         });
         document.getElementById('resumoBox').innerHTML = resumoTxt;
         document.getElementById('resumoBox').style.display = 'block';
@@ -2092,7 +2129,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
                 ['Base de dados', 'Município'],
                 ['Modo de seleção', 'Município inteiro'],
                 ['Município', props.NM_MUN],
-                ['Área do município', fmtAreaPDF(areaKm2 * 1e6)]
+                [filtroSituacaoAtivo ? 'Área filtrada (urbano/rural)' : 'Área do município', fmtAreaPDF(areaKm2 * 1e6)]
             ]),
             extraDetailText: `Dados do município de ${props.NM_MUN}.`,
             totalPopulation: totalPop,
@@ -2108,7 +2145,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             zoneAreaM2: areaKm2 * 1e6,
             coveredAreaM2: 0,
             domicilios: lastDomiciliosCache,
-            excluidosPorSituacao: 0
+            excluidosPorSituacao
         };
         exportReportBtn.style.display = 'block';
     }
@@ -2145,6 +2182,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         bufferControlsEl.style.display = (mode === 'buffer') ? 'block' : 'none';
         manualControlsEl.style.display = (mode === 'manual') ? 'block' : 'none';
         municipioControlsEl.style.display = (mode === 'municipio') ? 'block' : 'none';
+        document.getElementById('situacaoPanel').style.display = (mode === 'manual') ? 'none' : 'block';
     }
 
     document.querySelectorAll('input[name="analysisModeRadio"]').forEach(r => {
