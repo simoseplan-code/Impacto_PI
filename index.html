@@ -1038,9 +1038,13 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     }
 
     function computeImpact(analysisGeometries) {
-        const config = LAYER_CONFIGS[currentLayerKey];
         const proportional = (countMethod === 'proportional');
-        const situacaoAtiva = (currentLayerKey === 'setor') && (selectedSituacao.size < 2);
+        // O filtro urbano/rural só existe por setor censitário — quando está ativo,
+        // a análise sempre opera em granularidade de setor, mesmo que a base
+        // selecionada seja Bairro ou Município (mesma lógica do método "Por domicílios").
+        const situacaoAtiva = (selectedSituacao.size < 2) && (typeof PIAUI_GEOJSON !== 'undefined');
+        const config = LAYER_CONFIGS[situacaoAtiva ? 'setor' : currentLayerKey];
+        const dataSource = situacaoAtiva ? PIAUI_GEOJSON : activeData;
 
         let combinedGeom = null;
         if (analysisGeometries.length) {
@@ -1061,7 +1065,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         let excluidosPorSituacao = 0;   // setores tocados mas descartados pelo filtro urbano/rural
         const bboxAnalise = getGeometriesBBox(analysisGeometries);
 
-        activeData.features.forEach(feature => {
+        dataSource.features.forEach(feature => {
             try {
                 if (!bboxOverlaps(getFeatureBBox(feature), bboxAnalise)) return; // rejeição barata antes do teste geométrico real
                 const touches = analysisGeometries.some(geom => turf.booleanIntersects(feature, geom));
@@ -1115,7 +1119,8 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             coveredAreaM2,
             totalUnitsAreaM2,
             totalIntersectionAreaM2,
-            excluidosPorSituacao
+            excluidosPorSituacao,
+            usouGranularidadeSetor: situacaoAtiva
         };
     }
 
@@ -1622,11 +1627,12 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 
     function renderImpactResult(impact, extraDetailHtml) {
         const isDomiciliosMethod = (countMethod === 'domicilios');
-        const config = LAYER_CONFIGS[isDomiciliosMethod ? 'setor' : currentLayerKey];
+        const forcedSetor = isDomiciliosMethod || impact.usouGranularidadeSetor;
+        const config = LAYER_CONFIGS[forcedSetor ? 'setor' : currentLayerKey];
         lastImpactCache = impact;
         lastExtraDetailCache = extraDetailHtml || '';
 
-        const demografia = computeDemografia(impact.units, isDomiciliosMethod ? 'setor' : currentLayerKey);
+        const demografia = computeDemografia(impact.units, forcedSetor ? 'setor' : currentLayerKey);
         const isFiltered = isFilterActive();
         const hasDem = demografia && demografia.totalGeral > 0;
         const displayPop = hasDem ? getFilteredValue(demografia, selectedSexos, selectedFaixas) : impact.totalPopulation;
@@ -1639,7 +1645,16 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         document.getElementById('setoresCount').textContent = impact.unitsCount;
         document.getElementById('totalPopDisplay').textContent = fmt(TOTAL_POP_LOADED);
 
-        document.getElementById('domiciliosMethodNote').style.display = isDomiciliosMethod ? 'block' : 'none';
+        const noteEl = document.getElementById('domiciliosMethodNote');
+        if (isDomiciliosMethod) {
+            noteEl.textContent = 'Este método rateia a população oficial de cada setor pela fração de domicílios encontrados dentro da área — nunca cria população nova a partir de domicílios vagos. Sempre usa granularidade de setor censitário, independente da base selecionada acima.';
+            noteEl.style.display = 'block';
+        } else if (impact.usouGranularidadeSetor && currentLayerKey !== 'setor') {
+            noteEl.textContent = `O filtro urbano/rural só existe por setor censitário — como está ativo, esta análise usa granularidade de setor, mesmo com a base "${LAYER_CONFIGS[currentLayerKey].label}" selecionada acima.`;
+            noteEl.style.display = 'block';
+        } else {
+            noteEl.style.display = 'none';
+        }
 
         const avgRow = document.getElementById('avgMoradoresRow');
         if (isDomiciliosMethod && impact.totalDomicilios > 0) {
@@ -1877,8 +1892,9 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 
     function buildParametrosBuffer() {
         const config = LAYER_CONFIGS[currentLayerKey];
+        const situacaoForcaSetor = (selectedSituacao.size < 2) && (currentLayerKey !== 'setor') && (countMethod !== 'domicilios');
         const params = [];
-        params.push(['Base de dados', config.label]);
+        params.push(['Base de dados', config.label + (situacaoForcaSetor ? ' (calculado por Setor censitário — filtro urbano/rural ativo)' : '')]);
         params.push(['Modo de seleção', 'Raio / buffer']);
 
         if (currentMode === 'point' && currentPoint) {
