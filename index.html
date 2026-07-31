@@ -264,6 +264,11 @@ button:focus-visible {
 }
 .btn-primary { background: var(--teal); color: #fff; }
 .btn-primary:hover { background: var(--teal-dark); }
+.popup-select-mun-btn {
+    margin-top: 6px; padding: 5px 10px; font-size: 12px; font-weight: 700;
+    background: var(--teal); color: #fff; border: none; border-radius: 5px; cursor: pointer;
+}
+.popup-select-mun-btn:hover { background: var(--teal-dark); }
 .btn-secondary {
     background: var(--card); color: var(--ink-soft); border: 1px solid var(--line);
     margin-top: 8px; display: none;
@@ -910,12 +915,17 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
                 const nome = props[config.nameField] || config.nameFallback;
                 const sub = config.subField ? props[config.subField] : null;
 
+                const selecionarBtn = (config.key === 'municipio')
+                    ? `<br><button type="button" class="popup-select-mun-btn" onclick="window.selecionarMunicipioNoPopup('${code}')">Selecionar este município</button>`
+                    : '';
+
                 layer.bindPopup(`
                     <strong>${nome}</strong><br>
                     ${sub ? 'Município: ' + sub + '<br>' : ''}
                     Código: ${code}<br>
                     População: ${fmt(props.POP_TOTAL)}<br>
                     Área: ${(props.AREA_KM2 || 0).toFixed(2)} km²
+                    ${selecionarBtn}
                 `);
 
                 unitLayerByCode.set(code, layer);
@@ -2215,6 +2225,20 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     municipioSelect.addEventListener('change', (e) => {
         analyzeMunicipio(e.target.value);
     });
+
+    // Acionado pelo botão "Selecionar este município" dentro do popup do
+    // mapa: garante que o modo "Por município" fique ativo, sincroniza o
+    // <select> e roda a análise — sem precisar abrir o dropdown manualmente.
+    window.selecionarMunicipioNoPopup = function(codMun) {
+        const radioMunicipio = document.querySelector('input[name="analysisModeRadio"][value="municipio"]');
+        if (radioMunicipio && !radioMunicipio.checked) {
+            radioMunicipio.checked = true;
+            radioMunicipio.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        municipioSelect.value = codMun;
+        analyzeMunicipio(codMun);
+        map.closePopup();
+    };
 
     // ============================================================
     // Troca de modo (raio/buffer vs seleção manual)
