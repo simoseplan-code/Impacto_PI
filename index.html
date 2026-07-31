@@ -526,7 +526,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
                     <label class="segmented-option"><input type="radio" name="countMethodRadio" value="proportional"> Proporcional à área</label>
                     <label class="segmented-option"><input type="radio" name="countMethodRadio" value="domicilios"> Por domicílios</label>
                 </div>
-                <div class="demog-note" id="domiciliosMethodNote" style="display:none; margin-top:8px;">Este método sempre usa granularidade de setor censitário (onde está a média de moradores/domicílio do Censo), independente da base selecionada acima.</div>
+                <div class="demog-note" id="domiciliosMethodNote" style="display:none; margin-top:8px;">Este método rateia a população oficial de cada setor pela fração de domicílios encontrados dentro da área — nunca cria população nova a partir de domicílios vagos. Sempre usa granularidade de setor censitário, independente da base selecionada acima.</div>
             </div>
         </div>
 
@@ -690,7 +690,6 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 <script src="piaui_demografia_bairro.js"></script>
 <script src="piaui_demografia_municipio_exata.js"></script>
 <script src="piaui_domicilios_pontos.js"></script>
-<script src="piaui_v0005.js"></script>
 <script src="piaui_domicilios_municipio.js"></script>
 <script>
     // ============================================================
@@ -1213,7 +1212,8 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
                 nome: f.properties.NM_BAIRRO || 'Sem bairro',
                 sub: f.properties.NM_MUN || '',
                 geometry: f.geometry,
-                bbox: turf.bbox(f)
+                bbox: turf.bbox(f),
+                popTotal: f.properties.POP_TOTAL || 0
             });
         });
         return touched;
@@ -1251,18 +1251,23 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     }
 
     // ============================================================
-    // Método "Por domicílios": estima a população multiplicando,
-    // para cada setor tocado, a quantidade REAL de domicílios
-    // particulares encontrados dentro da zona de análise (pontos
-    // exatos) pela média de moradores por domicílio daquele setor
-    // (V0005, Censo 2022/IBGE). Mais preciso que "proporcional à
-    // área" porque usa a contagem real de casas, não uma fração
-    // geométrica da área do setor.
-    // Sempre opera em granularidade de setor censitário (é onde
-    // o V0005 existe), independente da base selecionada no painel.
+    // Método "Por domicílios": para cada setor tocado, rateia a
+    // população OFICIAL do setor (POP_TOTAL, Censo 2022) pela fração
+    // de domicílios particulares (pontos exatos) que caem dentro da
+    // zona de análise, em relação ao total de domicílios daquele
+    // setor inteiro. Não multiplica contagem de pontos por nenhuma
+    // média — os pontos só definem ONDE dentro do setor a população
+    // está mais concentrada, nunca criam população nova. Por
+    // construção, a soma de um setor nunca ultrapassa sua população
+    // oficial, e domicílios vagos/de uso ocasional não inflam o
+    // resultado (afetam igualmente o numerador e o denominador da
+    // fração). Mais preciso que "proporcional à área" porque usa
+    // a distribuição real das casas, não uma fração geométrica.
+    // Sempre opera em granularidade de setor censitário, independente
+    // da base selecionada no painel.
     // ============================================================
     function computeImpactPorDomicilios(analysisGeometries) {
-        const semDados = (typeof PIAUI_GEOJSON === 'undefined' || typeof PIAUI_V0005 === 'undefined');
+        const semDados = (typeof PIAUI_GEOJSON === 'undefined');
 
         let combinedGeom = null;
         if (analysisGeometries.length) {
@@ -1290,48 +1295,59 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             });
         }
 
-        // 2. Contagem real de domicílios particulares por setor, só os que caem
-        // dentro da zona de análise de fato (não do setor inteiro).
-        const bbox = getGeometriesBBox(analysisGeometries);
+        // 2. Contagem real de domicílios particulares por setor, tanto os que caem
+        // DENTRO da zona de análise quanto o total do setor inteiro (para achar a fração).
+        // Usa a mesma malha de pontos nos dois casos, então vagos/ocupados/uso ocasional
+        // afetam igualmente o numerador e o denominador — não inflam o resultado.
+        const bboxAnalise = getGeometriesBBox(analysisGeometries);
+        const bboxSetores = touched.length ? getGeometriesBBox(touched.map(t => t.geometry)) : bboxAnalise;
         const flatArr = getPontosParticular();
-        const countPerSetor = new Map();
+        const countNoBuffer = new Map();  // domicílios do setor que caem dentro do buffer
+        const countNoSetor = new Map();   // domicílios do setor inteiro (denominador da fração)
 
         for (let i = 0; i < flatArr.length; i += 2) {
             const lat = flatArr[i], lon = flatArr[i + 1];
-            if (lat < bbox.minLat || lat > bbox.maxLat || lon < bbox.minLon || lon > bbox.maxLon) continue;
+            if (lat < bboxSetores.minLat || lat > bboxSetores.maxLat || lon < bboxSetores.minLon || lon > bboxSetores.maxLon) continue;
             const pt = [lon, lat];
-
-            let insideBuffer = false;
-            for (let g = 0; g < analysisGeometries.length; g++) {
-                if (turf.booleanPointInPolygon(pt, analysisGeometries[g])) { insideBuffer = true; break; }
-            }
-            if (!insideBuffer) continue;
 
             for (let t = 0; t < touched.length; t++) {
                 const tb = touched[t].bbox; // [minLon,minLat,maxLon,maxLat]
                 if (lon < tb[0] || lon > tb[2] || lat < tb[1] || lat > tb[3]) continue;
-                if (turf.booleanPointInPolygon(pt, touched[t].geometry)) {
-                    countPerSetor.set(touched[t].codigo, (countPerSetor.get(touched[t].codigo) || 0) + 1);
-                    break;
+                if (!turf.booleanPointInPolygon(pt, touched[t].geometry)) continue;
+
+                const cod = touched[t].codigo;
+                countNoSetor.set(cod, (countNoSetor.get(cod) || 0) + 1);
+
+                if (lat >= bboxAnalise.minLat && lat <= bboxAnalise.maxLat && lon >= bboxAnalise.minLon && lon <= bboxAnalise.maxLon) {
+                    let insideBuffer = false;
+                    for (let g = 0; g < analysisGeometries.length; g++) {
+                        if (turf.booleanPointInPolygon(pt, analysisGeometries[g])) { insideBuffer = true; break; }
+                    }
+                    if (insideBuffer) countNoBuffer.set(cod, (countNoBuffer.get(cod) || 0) + 1);
                 }
+                break;
             }
         }
 
-        // 3. Converte contagem de domicílios em população via V0005 do setor
+        // 3. Distribui a população OFICIAL do setor (POP_TOTAL, do Censo) proporcionalmente
+        // à fração de domicílios encontrados dentro do buffer — nunca cria população nova.
+        // Um setor tocado só de raspão, com poucos domicílios na área, contribui só
+        // com a fração correspondente da sua população; nunca ultrapassa o total oficial.
         let totalPopulation = 0;
         let totalDomicilios = 0;
         let semDadoSetores = 0;
         const units = [];
 
         touched.forEach(t => {
-            const domCount = countPerSetor.get(t.codigo) || 0;
-            if (domCount === 0) return;
-            const v5 = PIAUI_V0005[t.codigo];
-            if (!v5 || v5 <= 0) { semDadoSetores++; return; }
-            const pop = domCount * v5;
+            const domCountBuffer = countNoBuffer.get(t.codigo) || 0;
+            if (domCountBuffer === 0) return;
+            const domCountSetor = countNoSetor.get(t.codigo) || 0;
+            if (domCountSetor === 0) { semDadoSetores++; return; } // sem domicílio geocodificado nesse setor -> sem base pra ratear
+            const fracao = Math.min(domCountBuffer / domCountSetor, 1);
+            const pop = t.popTotal * fracao;
             totalPopulation += pop;
-            totalDomicilios += domCount;
-            units.push({ codigo: t.codigo, nome: t.nome, sub: t.sub, pop, ratio: 1, domCount, v0005: v5 });
+            totalDomicilios += domCountBuffer;
+            units.push({ codigo: t.codigo, nome: t.nome, sub: t.sub, pop, ratio: fracao, domCount: domCountBuffer, domCountSetor });
         });
 
         units.sort((a, b) => b.pop - a.pop);
@@ -1508,11 +1524,11 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         if (cm === 'domicilios') {
             const totalDom = domiciliosMetodo ? domiciliosMetodo.totalDomicilios : 0;
             const avgM = (domiciliosMetodo && totalDom > 0) ? (totalPopulationFull / totalDom) : null;
-            txt += `A população foi estimada a partir de <strong>${fmt(totalDom)} domicílios particulares</strong> localizados de fato dentro da zona de análise`;
-            if (avgM) txt += `, com uma média de <strong>${avgM.toFixed(1)} moradores por domicílio</strong> (V0005, Censo 2022) nos setores envolvidos`;
+            txt += `A população foi obtida rateando a população oficial de cada setor pela fração dos seus domicílios particulares localizados dentro da zona de análise — <strong>${fmt(totalDom)} domicílios</strong> ao todo`;
+            if (avgM) txt += ` (média efetiva de <strong>${avgM.toFixed(1)} habitantes por domicílio</strong> na área)`;
             txt += '. ';
             if (domiciliosMetodo && domiciliosMetodo.semDadoSetores > 0) {
-                txt += `${domiciliosMetodo.semDadoSetores} ${domiciliosMetodo.semDadoSetores === 1 ? 'setor tocado ficou' : 'setores tocados ficaram'} de fora por não ter média de moradores válida no Censo. `;
+                txt += `${domiciliosMetodo.semDadoSetores} ${domiciliosMetodo.semDadoSetores === 1 ? 'setor tocado ficou' : 'setores tocados ficaram'} de fora por não ter domicílio geocodificado suficiente pra ratear a população. `;
             }
         } else if (cm === 'proportional') {
             if (zoneAreaM2 > 0) {
@@ -1872,7 +1888,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         params.push(['Metodologia de contagem', countMethod === 'proportional'
             ? 'Proporcional à área dentro da zona de influência'
             : (countMethod === 'domicilios'
-                ? 'Por número de domicílios (contagem exata × média de moradores/domicílio do setor, V0005/Censo 2022)'
+                ? 'Por número de domicílios (rateio da população oficial do setor pela fração de domicílios na área, Censo 2022)'
                 : 'Total da unidade tocada')]);
         return addFilterParams(params);
     }
@@ -2949,7 +2965,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         } else if (lastReport.countMethod === 'total') {
             notas.push('Metodologia "total da unidade tocada": qualquer unidade tocada pela área de análise entra com sua população total, sem rateio parcial.');
         } else if (lastReport.countMethod === 'domicilios') {
-            notas.push('Metodologia "por número de domicílios": para cada setor censitário tocado, conta-se a quantidade real de domicílios particulares (pontos exatos do Censo) que caem dentro da zona de análise, multiplicada pela média de moradores por domicílio daquele setor (V0005, Censo 2022, tabela Agregados por Setores - Básico). Setores tocados sem V0005 válido não entram na soma.');
+            notas.push('Metodologia "por número de domicílios": para cada setor censitário tocado, conta-se quantos domicílios particulares (pontos exatos do Censo) caem dentro da zona de análise e quantos existem no setor inteiro; a população OFICIAL do setor (Censo 2022) é então rateada nessa mesma proporção. Os pontos só indicam onde a população está mais concentrada dentro do setor — não são multiplicados por nenhuma média, então domicílios vagos ou de uso ocasional não criam população fictícia, e nenhum setor pode ultrapassar sua população oficial. Setores tocados sem nenhum domicílio geocodificado não entram na soma.');
         } else {
             notas.push('Seleção manual: cada unidade clicada entra com sua população total — não há rateio parcial, já que a escolha é sempre de unidades inteiras.');
         }
