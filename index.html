@@ -145,6 +145,40 @@ body { padding: 20px; }
     overflow-y: auto;
 }
 
+/* ===== Abas de navegação (Populacional vs Barragens) ===== */
+.app-tabs {
+    max-width: 1400px;
+    margin: 0 auto 16px;
+    display: flex;
+    gap: 8px;
+    background: var(--card);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 1px 3px rgba(15, 30, 30, 0.07);
+}
+.app-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 13px 16px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all .15s ease;
+}
+.app-tab .tab-icon { font-size: 16px; }
+.app-tab:hover { background: var(--paper); color: var(--ink-soft); }
+.app-tab.active { background: var(--teal); color: #fff; }
+.app-tab.active:hover { background: var(--teal); }
+.app-tab .tab-sub { font-family: var(--font-body); font-weight: 500; font-size: 11.5px; opacity: 0.85; }
+
 /* ===== Panels ===== */
 .panel { margin-bottom: 18px; }
 
@@ -484,9 +518,9 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         </div>
     </div>
     <div class="topbar-center">
-        <h1 class="topbar-h1"><span class="accent">Análise</span> de Impacto Populacional</h1>
+        <h1 class="topbar-h1" id="appTitle"><span class="accent">Análise</span> de Impacto Populacional</h1>
         <div class="topbar-sub-row">
-            <span class="topbar-sub">UF 22 · SIRGAS2000 · Censo IBGE 2022</span>
+            <span class="topbar-sub" id="appSubtitle">UF 22 · SIRGAS2000 · Censo IBGE 2022</span>
             <span class="topbar-badge">Piauí</span>
         </div>
     </div>
@@ -496,6 +530,15 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             <div class="dima-sub">Diretoria de Monitoramento de Ações</div>
         </div>
     </div>
+</div>
+
+<div class="app-tabs">
+    <button type="button" class="app-tab active" id="tabPopulacionalBtn">
+        <span class="tab-icon">👥</span> Impacto Populacional
+    </button>
+    <button type="button" class="app-tab" id="tabBarragensBtn">
+        <span class="tab-icon">🌊</span> Impacto de Barragens <span class="tab-sub">(cursos d'água)</span>
+    </button>
 </div>
 
 <div class="container">
@@ -514,13 +557,12 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             <div class="hint" id="layerHint" style="display:none; margin-top:10px;"></div>
         </div>
 
-        <div class="panel">
+        <div class="panel" id="modeSegmentedPanel">
             <div class="panel-head"><span class="panel-tick"></span><h2>Modo de seleção</h2></div>
             <div class="segmented" id="modeSegmented">
                 <label class="segmented-option active"><input type="radio" name="analysisModeRadio" value="buffer" checked> Raio / buffer</label>
                 <label class="segmented-option"><input type="radio" name="analysisModeRadio" value="manual"> Clique no mapa</label>
                 <label class="segmented-option"><input type="radio" name="analysisModeRadio" value="municipio"> Por município</label>
-                <label class="segmented-option"><input type="radio" name="analysisModeRadio" value="rio"> Trecho de rio (barragem)</label>
             </div>
         </div>
 
@@ -2762,6 +2804,44 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 
         if (mode === 'rio') resetRioState();
     }
+
+    // ============================================================
+    // Abas de navegação: Impacto Populacional vs Impacto de Barragens
+    // Cada aba força um "modo de análise" e mostra/esconde os painéis
+    // que só fazem sentido num dos dois contextos.
+    // ============================================================
+    let currentTopTab = 'populacional';
+    const tabPopulacionalBtn = document.getElementById('tabPopulacionalBtn');
+    const tabBarragensBtn = document.getElementById('tabBarragensBtn');
+    const modeSegmentedPanel = document.getElementById('modeSegmentedPanel');
+
+    function switchTopTab(tab) {
+        if (currentTopTab === tab) return;
+        currentTopTab = tab;
+        tabPopulacionalBtn.classList.toggle('active', tab === 'populacional');
+        tabBarragensBtn.classList.toggle('active', tab === 'barragens');
+        modeSegmentedPanel.style.display = (tab === 'populacional') ? 'block' : 'none';
+
+        const appTitle = document.getElementById('appTitle');
+        const appSubtitle = document.getElementById('appSubtitle');
+        if (tab === 'barragens') {
+            appTitle.innerHTML = '<span class="accent">Impacto</span> de Barragens';
+            appSubtitle.textContent = 'Trecho de rio + faixa de influência · Cursos d\'água ANA/BHO';
+        } else {
+            appTitle.innerHTML = '<span class="accent">Análise</span> de Impacto Populacional';
+            appSubtitle.textContent = 'UF 22 · SIRGAS2000 · Censo IBGE 2022';
+        }
+
+        if (tab === 'barragens') {
+            setAnalysisMode('rio');
+        } else {
+            const checkedRadio = document.querySelector('input[name="analysisModeRadio"]:checked');
+            setAnalysisMode(checkedRadio ? checkedRadio.value : 'buffer');
+        }
+    }
+
+    tabPopulacionalBtn.addEventListener('click', () => switchTopTab('populacional'));
+    tabBarragensBtn.addEventListener('click', () => switchTopTab('barragens'));
 
     document.querySelectorAll('input[name="analysisModeRadio"]').forEach(r => {
         r.addEventListener('change', (e) => {
