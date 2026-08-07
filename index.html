@@ -281,6 +281,38 @@ button:focus-visible {
 }
 .btn-export:hover { background: var(--teal-pale); }
 
+/* ===== Painel "Trecho de rio / barragem" ===== */
+.rio-snap-info {
+    margin-top: 10px; padding: 10px 12px; border-radius: 7px;
+    background: var(--teal-pale); border: 1px solid #c9e5db;
+    font-size: 12px; color: var(--ink-soft); line-height: 1.5;
+}
+.rio-snap-info strong { color: var(--teal-dark); }
+.rio-snap-warn {
+    margin-top: 10px; padding: 10px 12px; border-radius: 7px;
+    background: var(--amber-pale); border: 1px solid #f0d9b5;
+    font-size: 12px; color: #7a4a10; line-height: 1.5;
+}
+.btn-example {
+    background: var(--card); color: var(--ink-soft); border: 1px dashed #c9d2d0;
+    margin-top: 8px; font-weight: 600;
+}
+.btn-example:hover { background: var(--paper); border-color: var(--teal); color: var(--teal-dark); }
+.rio-direction-group { display: flex; gap: 6px; margin-top: 6px; }
+.rio-direction-group label {
+    flex: 1; text-align: center; padding: 7px 4px; border-radius: 6px;
+    border: 1px solid var(--line); font-size: 11.5px; font-weight: 600;
+    color: var(--ink-soft); cursor: pointer; transition: all .15s ease;
+}
+.rio-direction-group input { display: none; }
+.rio-direction-group label.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+.coord-mode-toggle { display: flex; gap: 8px; margin-bottom: 10px; }
+.coord-mode-toggle button {
+    flex: 1; padding: 7px; font-size: 11.5px; font-weight: 700; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--card); color: var(--muted); cursor: pointer;
+}
+.coord-mode-toggle button.active { background: var(--teal-pale); border-color: var(--teal); color: var(--teal-dark); }
+
 .file-input-wrap { margin-bottom: 8px; }
 .file-input-wrap input[type="file"] {
     width: 100%; font-size: 11.5px; padding: 8px; border: 1px dashed #c9d2d0;
@@ -488,6 +520,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
                 <label class="segmented-option active"><input type="radio" name="analysisModeRadio" value="buffer" checked> Raio / buffer</label>
                 <label class="segmented-option"><input type="radio" name="analysisModeRadio" value="manual"> Clique no mapa</label>
                 <label class="segmented-option"><input type="radio" name="analysisModeRadio" value="municipio"> Por município</label>
+                <label class="segmented-option"><input type="radio" name="analysisModeRadio" value="rio"> Trecho de rio (barragem)</label>
             </div>
         </div>
 
@@ -553,6 +586,41 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
                     </select>
                 </div>
                 <div class="hint" style="margin-top:8px;">Mostra os dados do município inteiro direto — população, domicílios e perfil demográfico — sem precisar desenhar um raio.</div>
+            </div>
+        </div>
+
+        <div id="rioControls" style="display:none;">
+            <div class="panel">
+                <div class="panel-head"><span class="panel-tick"></span><h2>Local da barragem</h2></div>
+                <div class="hint" style="margin-top:0;">Clique no mapa perto do rio ou informe as coordenadas. O ponto é ajustado (“snapado”) automaticamente para o curso d'água mais próximo.</div>
+                <div class="coord-grid" style="margin-top:10px;">
+                    <div class="field"><label for="rioLatInput">Latitude</label><input type="text" id="rioLatInput" placeholder="-10.493305" /></div>
+                    <div class="field"><label for="rioLngInput">Longitude</label><input type="text" id="rioLngInput" placeholder="-44.856473" /></div>
+                </div>
+                <button class="btn btn-primary" id="rioMarkBtn">Marcar no mapa</button>
+                <button class="btn btn-example" id="rioExampleBtn">📍 Carregar exemplo: Barragem Nova Algodões</button>
+                <div class="rio-snap-info" id="rioSnapInfo" style="display:none;"></div>
+                <div class="rio-snap-warn" id="rioSnapWarn" style="display:none;"></div>
+            </div>
+
+            <div class="panel" id="rioParamsPanel" style="display:none;">
+                <div class="panel-head"><span class="panel-tick"></span><h2>Trecho a analisar</h2></div>
+                <div class="field">
+                    <label>Direção a partir do ponto</label>
+                    <div class="rio-direction-group" id="rioDirecaoGroup">
+                        <label class="active" data-value="jusante"><input type="radio" name="rioDirecao" value="jusante" checked> Jusante<br>(rio abaixo)</label>
+                        <label data-value="montante"><input type="radio" name="rioDirecao" value="montante"> Montante<br>(rio acima)</label>
+                        <label data-value="ambas"><input type="radio" name="rioDirecao" value="ambas"> Ambas<br>direções</label>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="rioExtensaoKm">Extensão do trecho (km, por direção)</label>
+                    <input type="number" id="rioExtensaoKm" value="10" min="0.1" max="200" step="0.5" />
+                </div>
+                <div class="field">
+                    <label for="rioBufferM">Faixa de influência ao redor do trecho (metros)</label>
+                    <input type="number" id="rioBufferM" value="500" min="50" max="10000" step="50" />
+                </div>
             </div>
         </div>
 
@@ -679,6 +747,8 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             <div class="legend-item"><span class="legend-swatch" style="background:#157a61; opacity:0.5;"></span> <span id="legendUnitHighlightLabel">Setor contabilizado</span></div>
             <div class="legend-item"><span class="legend-swatch" style="background:transparent; border:2px dashed #157a61;"></span> Área de influência</div>
             <div class="legend-item"><span class="legend-swatch" style="background:#d9632a;"></span> Geometria importada</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:transparent; border-top:2px solid #6fa8c9;"></span> Rios principais (referência)</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:transparent; border-top:2.5px solid #0e5a47;"></span> Trecho de rio seguido</div>
         </div>
     </div>
 </div>
@@ -697,6 +767,8 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 <script src="piaui_domicilios_pontos.js"></script>
 <script src="piaui_domicilios_setor.js"></script>
 <script src="piaui_domicilios_municipio.js"></script>
+<script src="piaui_cursos_dagua.js"></script>
+<script src="piaui_rios_principais.js"></script>
 <script>
     // ============================================================
     // Configuração das bases disponíveis
@@ -845,6 +917,15 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     const manualControlsEl = document.getElementById('manualControls');
     const municipioControlsEl = document.getElementById('municipioControls');
     const municipioSelect = document.getElementById('municipioSelect');
+    const rioLatInput = document.getElementById('rioLatInput');
+    const rioLngInput = document.getElementById('rioLngInput');
+    const rioMarkBtn = document.getElementById('rioMarkBtn');
+    const rioExampleBtn = document.getElementById('rioExampleBtn');
+    const rioSnapInfo = document.getElementById('rioSnapInfo');
+    const rioSnapWarn = document.getElementById('rioSnapWarn');
+    const rioParamsPanel = document.getElementById('rioParamsPanel');
+    const rioExtensaoKmInput = document.getElementById('rioExtensaoKm');
+    const rioBufferMInput = document.getElementById('rioBufferM');
 
     // ============================================================
     // Helpers
@@ -1648,7 +1729,8 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         const displayPop = hasDem ? getFilteredValue(demografia, selectedSexos, selectedFaixas) : impact.totalPopulation;
         const displayPercentage = TOTAL_POP_LOADED > 0 ? ((displayPop / TOTAL_POP_LOADED) * 100).toFixed(4) : '0.0000';
 
-        document.getElementById('resultLabel').textContent = 'População diretamente beneficiada' + filterSuffixLabel();
+        const rioLabelBase = (currentMode === 'rio-trace') ? 'População na faixa de influência do trecho' : 'População diretamente beneficiada';
+        document.getElementById('resultLabel').textContent = rioLabelBase + filterSuffixLabel();
         document.getElementById('benefited').textContent = fmt(displayPop);
         document.getElementById('percentSub').innerHTML = `<strong>${displayPercentage}%</strong> da população da base carregada (${fmt(TOTAL_POP_LOADED)} hab.)`;
         document.getElementById('percentBar').style.width = Math.min(100, parseFloat(displayPercentage) * 10) + '%';
@@ -2241,6 +2323,426 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     };
 
     // ============================================================
+    // Trecho de rio (barragem) — segue a rede de cursos d'água
+    // (ANA/BHO) a partir de um ponto "snapado" no rio mais próximo,
+    // por X km rio acima/abaixo/ambos, e faz o buffer desse trecho
+    // pra rodar a mesma análise de impacto populacional de sempre.
+    // ============================================================
+    let currentRioPath = null;      // [[lat,lng], ...] do trecho atual, já cortado no comprimento pedido
+    let currentRioPoint = null;     // { lat, lng } ponto original clicado/informado
+    let currentRioSnap = null;      // { segIdx, distAlongKm, snapLat, snapLng, distSnapM, ordem, areaKm2 }
+    let rioDirecao = 'jusante';     // 'jusante' | 'montante' | 'ambas'
+
+    const EXEMPLO_BARRAGEM_ALGODOES = { lat: -3.491581, lng: -41.427012, nome: 'Barragem Nova Algodões' };
+
+    // ---- Decodificação lazy dos dados binários da rede de rios ----
+    let RIOS_COORDS_F32 = null;   // Float32Array [lon,lat,lon,lat,...]
+    let RIOS_OFFSETS_I32 = null;  // Int32Array, offsets[i]..offsets[i+1] = pontos do segmento i
+    let RIOS_READY = false;
+
+    function decodeB64Float32Rio(b64) {
+        const binStr = atob(b64);
+        const len = binStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i);
+        return new Float32Array(bytes.buffer);
+    }
+    function decodeB64Int32Rio(b64) {
+        const binStr = atob(b64);
+        const len = binStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i);
+        return new Int32Array(bytes.buffer);
+    }
+
+    function ensureRiosLoaded() {
+        if (RIOS_READY) return true;
+        if (typeof RIOS_COORDS_B64 === 'undefined' || typeof RIOS_OFFSETS_B64 === 'undefined') return false;
+        RIOS_COORDS_F32 = decodeB64Float32Rio(RIOS_COORDS_B64);
+        RIOS_OFFSETS_I32 = decodeB64Int32Rio(RIOS_OFFSETS_B64);
+        RIOS_READY = true;
+        return true;
+    }
+
+    function rioSegPointCount(segIdx) {
+        return RIOS_OFFSETS_I32[segIdx + 1] - RIOS_OFFSETS_I32[segIdx];
+    }
+    // Retorna [lon, lat] do ponto `i` (índice local dentro do segmento) do segmento segIdx
+    function rioSegPoint(segIdx, i) {
+        const base = (RIOS_OFFSETS_I32[segIdx] + i) * 2;
+        return [RIOS_COORDS_F32[base], RIOS_COORDS_F32[base + 1]];
+    }
+
+    function haversineKm(lon1, lat1, lon2, lat2) {
+        const R = 6371.0088;
+        const phi1 = lat1 * Math.PI / 180, phi2 = lat2 * Math.PI / 180;
+        const dphi = (lat2 - lat1) * Math.PI / 180;
+        const dl = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dphi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dl / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    // Distância aproximada (plana, em graus->km via fator local de latitude)
+    // de um ponto a um segmento de reta [a,b], e fração t (0..1) de projeção.
+    function pointToSegDist(px, py, ax, ay, bx, by, kx, ky) {
+        const pxm = px * kx, pym = py * ky;
+        const axm = ax * kx, aym = ay * ky;
+        const bxm = bx * kx, bym = by * ky;
+        const dx = bxm - axm, dy = bym - aym;
+        let t = 0;
+        if (dx !== 0 || dy !== 0) {
+            t = ((pxm - axm) * dx + (pym - aym) * dy) / (dx * dx + dy * dy);
+            t = Math.max(0, Math.min(1, t));
+        }
+        const projx = axm + t * dx, projy = aym + t * dy;
+        return { dist: Math.hypot(pxm - projx, pym - projy), t };
+    }
+
+    // Acha o segmento da rede de rios mais próximo de (lat,lng).
+    // Retorna { segIdx, localIdx, t, distAlongKm, snapLon, snapLat, distKm }
+    function findNearestRioSegment(lat, lng) {
+        if (!ensureRiosLoaded()) return null;
+        const lat0 = lat * Math.PI / 180;
+        const kx = 111.320 * Math.cos(lat0);
+        const ky = 110.574;
+        const nSeg = RIOS_OFFSETS_I32.length - 1;
+        let best = null;
+        for (let s = 0; s < nSeg; s++) {
+            const n = rioSegPointCount(s);
+            if (n < 2) continue;
+            // rejeição barata: bbox do segmento (usa primeiro/último ponto + folga,
+            // suficiente pois rios não fazem curvas absurdas fora do próprio traçado —
+            // então testamos alguns pontos amostrados pra decidir se vale a pena checar tudo)
+            let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+            for (let i = 0; i < n; i += Math.max(1, Math.floor(n / 12))) {
+                const p = rioSegPoint(s, i);
+                if (p[0] < minLon) minLon = p[0];
+                if (p[0] > maxLon) maxLon = p[0];
+                if (p[1] < minLat) minLat = p[1];
+                if (p[1] > maxLat) maxLat = p[1];
+            }
+            const pad = 0.06;
+            if (lng < minLon - pad || lng > maxLon + pad || lat < minLat - pad || lat > maxLat + pad) continue;
+
+            let prev = rioSegPoint(s, 0);
+            for (let i = 1; i < n; i++) {
+                const cur = rioSegPoint(s, i);
+                const r = pointToSegDist(lng, lat, prev[0], prev[1], cur[0], cur[1], kx, ky);
+                if (best === null || r.dist < best.dist) {
+                    best = { segIdx: s, localIdx: i - 1, t: r.t, dist: r.dist };
+                }
+                prev = cur;
+            }
+        }
+        if (best === null) return null;
+
+        // comprimento acumulado até o ponto snapado, dentro do segmento
+        let distAlongKm = 0;
+        let snapLon, snapLat;
+        {
+            let prev = rioSegPoint(best.segIdx, 0);
+            for (let i = 1; i <= best.localIdx; i++) {
+                const cur = rioSegPoint(best.segIdx, i);
+                distAlongKm += haversineKm(prev[0], prev[1], cur[0], cur[1]);
+                prev = cur;
+            }
+            const a = rioSegPoint(best.segIdx, best.localIdx);
+            const b = rioSegPoint(best.segIdx, best.localIdx + 1);
+            const subKm = haversineKm(a[0], a[1], b[0], b[1]);
+            distAlongKm += subKm * best.t;
+            snapLon = a[0] + (b[0] - a[0]) * best.t;
+            snapLat = a[1] + (b[1] - a[1]) * best.t;
+        }
+        // distância real (haversine) do ponto clicado até o ponto snapado
+        const distKm = haversineKm(lng, lat, snapLon, snapLat);
+
+        return { segIdx: best.segIdx, distAlongKm, snapLon, snapLat, distKm };
+    }
+
+    // ---- Grafo de conectividade (montado uma vez, sob demanda) ----
+    let RIO_GRAPH = null; // { byStart: Map(key->[idx]), byEnd: Map(key->[idx]) }
+    function nodeKey(lon, lat) {
+        return Math.round(lon * 1e5) + '_' + Math.round(lat * 1e5);
+    }
+    function buildRioGraph() {
+        if (RIO_GRAPH) return RIO_GRAPH;
+        ensureRiosLoaded();
+        const byStart = new Map(), byEnd = new Map();
+        const nSeg = RIOS_OFFSETS_I32.length - 1;
+        for (let s = 0; s < nSeg; s++) {
+            const n = rioSegPointCount(s);
+            if (n < 2) continue;
+            const a = rioSegPoint(s, 0);
+            const b = rioSegPoint(s, n - 1);
+            const ka = nodeKey(a[0], a[1]), kb = nodeKey(b[0], b[1]);
+            if (!byStart.has(ka)) byStart.set(ka, []);
+            byStart.get(ka).push(s);
+            if (!byEnd.has(kb)) byEnd.set(kb, []);
+            byEnd.get(kb).push(s);
+        }
+        RIO_GRAPH = { byStart, byEnd };
+        return RIO_GRAPH;
+    }
+
+    // Percorre a rede a partir de (segIdx, distAlongKm) por até targetKm,
+    // na direção 'jusante' (segue o sentido das coordenadas, rio abaixo) ou
+    // 'montante' (sentido contrário, rio acima — em confluências, segue
+    // sempre o afluente com maior área de bacia acumulada, como aproximação
+    // do canal principal). Retorna array de [lat,lng] do trajeto percorrido.
+    function traceRio(segIdx, distAlongKm, direction, targetKm) {
+        const graph = buildRioGraph();
+        const path = []; // [lon,lat]
+        let guard = 0;
+
+        if (direction === 'jusante') {
+            let s = segIdx;
+            let startFromKm = distAlongKm; // ponto de partida dentro do 1º segmento
+            let remaining = targetKm;
+            let first = true;
+            while (s !== null && remaining > 0.0001 && guard++ < 5000) {
+                const n = rioSegPointCount(s);
+                const pts = [];
+                let acc = 0;
+                let prev = rioSegPoint(s, 0);
+                pts.push(prev);
+                let started = first ? false : true;
+                let startAcc = first ? startFromKm : 0;
+                for (let i = 1; i < n; i++) {
+                    const cur = rioSegPoint(s, i);
+                    const segKm = haversineKm(prev[0], prev[1], cur[0], cur[1]);
+                    acc += segKm;
+                    pts.push(cur);
+                    prev = cur;
+                }
+                // recorta a parte do segmento que vai de startAcc até min(acc, startAcc+remaining)
+                const clipped = clipPolylineByDistance(pts, startAcc, startAcc + remaining);
+                if (clipped.length) {
+                    if (path.length && pointsEqual(path[path.length - 1], clipped[0])) clipped.shift();
+                    path.push(...clipped);
+                }
+                const segTotalKm = acc;
+                const usedKm = Math.max(0, Math.min(segTotalKm, startAcc + remaining) - startAcc);
+                remaining -= usedKm;
+                first = false;
+                if (remaining <= 0.0001) break;
+
+                const end = rioSegPoint(s, n - 1);
+                const nexts = graph.byStart.get(nodeKey(end[0], end[1])) || [];
+                const candidates = nexts.filter(idx => idx !== s);
+                if (!candidates.length) { s = null; break; }
+                s = candidates[0];
+                startFromKm = 0;
+            }
+        } else { // montante
+            let s = segIdx;
+            let endAtKm = distAlongKm; // ponto de partida (olhando pra trás, do início até aqui)
+            let remaining = targetKm;
+            let first = true;
+            while (s !== null && remaining > 0.0001 && guard++ < 5000) {
+                const n = rioSegPointCount(s);
+                const pts = [];
+                let prev = rioSegPoint(s, 0);
+                pts.push(prev);
+                let acc = 0;
+                for (let i = 1; i < n; i++) {
+                    const cur = rioSegPoint(s, i);
+                    acc += haversineKm(prev[0], prev[1], cur[0], cur[1]);
+                    pts.push(cur);
+                    prev = cur;
+                }
+                const upperBound = first ? endAtKm : acc;
+                const lowerBound = Math.max(0, upperBound - remaining);
+                const clipped = clipPolylineByDistance(pts, lowerBound, upperBound).reverse();
+                if (clipped.length) {
+                    if (path.length && pointsEqual(path[path.length - 1], clipped[0])) clipped.shift();
+                    path.push(...clipped);
+                }
+                const usedKm = upperBound - lowerBound;
+                remaining -= usedKm;
+                first = false;
+                if (remaining <= 0.0001) break;
+
+                const start = rioSegPoint(s, 0);
+                const feeders = (graph.byEnd.get(nodeKey(start[0], start[1])) || []).filter(idx => idx !== s);
+                if (!feeders.length) { s = null; break; }
+                // heurística: segue o afluente de maior área de bacia acumulada (canal principal)
+                let bestIdx = feeders[0], bestArea = -1;
+                feeders.forEach(idx => {
+                    const area = (RIOS_META[idx] && RIOS_META[idx][1]) || 0;
+                    if (area > bestArea) { bestArea = area; bestIdx = idx; }
+                });
+                s = bestIdx;
+            }
+        }
+        return path.map(([lon, lat]) => [lat, lon]);
+    }
+
+    function pointsEqual(a, b) {
+        return Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9;
+    }
+
+    // Recorta uma polilinha [[lon,lat],...] (com distância acumulada implícita)
+    // entre kmFrom e kmTo (ambos dentro do comprimento total da polilinha),
+    // devolvendo os pontos (incluindo pontos interpolados nas bordas do corte).
+    function clipPolylineByDistance(pts, kmFrom, kmTo) {
+        if (kmTo <= kmFrom) return [];
+        const out = [];
+        let acc = 0;
+        for (let i = 0; i < pts.length - 1; i++) {
+            const a = pts[i], b = pts[i + 1];
+            const segKm = haversineKm(a[0], a[1], b[0], b[1]);
+            const segStart = acc, segEnd = acc + segKm;
+            if (segEnd >= kmFrom && segStart <= kmTo) {
+                const startFrac = segKm > 0 ? Math.max(0, (kmFrom - segStart) / segKm) : 0;
+                const endFrac = segKm > 0 ? Math.min(1, (kmTo - segStart) / segKm) : 1;
+                const p1 = [a[0] + (b[0] - a[0]) * startFrac, a[1] + (b[1] - a[1]) * startFrac];
+                const p2 = [a[0] + (b[0] - a[0]) * endFrac, a[1] + (b[1] - a[1]) * endFrac];
+                if (!out.length || !pointsEqual(out[out.length - 1], p1)) out.push(p1);
+                out.push(p2);
+            }
+            acc = segEnd;
+            if (acc > kmTo) break;
+        }
+        return out;
+    }
+
+    function getRioBufferMeters() {
+        const v = parseFloat(rioBufferMInput.value);
+        return (isNaN(v) || v <= 0) ? 500 : v;
+    }
+
+    function resetRioState() {
+        currentRioPath = null;
+        currentRioPoint = null;
+        currentRioSnap = null;
+        rioSnapInfo.style.display = 'none';
+        rioSnapWarn.style.display = 'none';
+        rioParamsPanel.style.display = 'none';
+        rioLatInput.value = '';
+        rioLngInput.value = '';
+    }
+
+    function formatOrdemRio(ordem) {
+        return ordem ? `ordem ${ordem} (Strahler)` : 'ordem não informada';
+    }
+
+    function runRioAnalysis(lat, lng) {
+        clearAnalysisLayers();
+        currentMode = 'rio-trace';
+        currentRioPoint = { lat, lng };
+
+        if (!ensureRiosLoaded()) {
+            rioSnapWarn.textContent = 'Dados da rede de cursos d\'água ainda não carregaram — tente novamente em instantes.';
+            rioSnapWarn.style.display = 'block';
+            return;
+        }
+
+        const snap = findNearestRioSegment(lat, lng);
+        if (!snap) {
+            rioSnapWarn.textContent = 'Nenhum curso d\'água encontrado perto desse ponto.';
+            rioSnapWarn.style.display = 'block';
+            rioParamsPanel.style.display = 'none';
+            return;
+        }
+        currentRioSnap = snap;
+
+        const marker = L.marker([lat, lng], { icon: MARKER_ICON }).bindPopup('Local informado (barragem)');
+        referenceLayerGroup.addLayer(marker);
+        const snapMarker = L.circleMarker([snap.snapLat, snap.snapLon], {
+            radius: 5, color: '#0e5a47', weight: 2, fillColor: '#157a61', fillOpacity: 0.9
+        }).bindPopup('Ponto ajustado ao curso d\'água');
+        referenceLayerGroup.addLayer(snapMarker);
+        if (snap.distKm > 0.01) {
+            L.polyline([[lat, lng], [snap.snapLat, snap.snapLon]], { color: '#a8651a', weight: 2, dashArray: '4,4' }).addTo(referenceLayerGroup);
+        }
+
+        const meta = RIOS_META[snap.segIdx] || [0, 0, 0, 0];
+        rioSnapInfo.innerHTML = `Ponto ajustado ao curso d'água mais próximo — <strong>${(snap.distKm * 1000).toFixed(0)} m</strong> do local informado.<br>` +
+            `Trecho local: ${formatOrdemRio(meta[2])}, área de bacia acumulada ≈ <strong>${fmt(Math.round(meta[1]))} km²</strong>.`;
+        rioSnapInfo.style.display = 'block';
+        rioSnapWarn.style.display = (snap.distKm > 1) ? 'block' : 'none';
+        if (snap.distKm > 1) {
+            rioSnapWarn.textContent = `Atenção: o curso d'água mais próximo está a ${snap.distKm.toFixed(2)} km do ponto informado — confira se é o rio certo antes de seguir.`;
+        }
+        rioParamsPanel.style.display = 'block';
+
+        latInputSyncRio(lat, lng);
+        setMode('Trecho de rio · barragem');
+        recomputeRioPath();
+        map.setView([lat, lng], Math.max(map.getZoom(), 12));
+    }
+
+    function latInputSyncRio(lat, lng) {
+        rioLatInput.value = lat.toFixed(6);
+        rioLngInput.value = lng.toFixed(6);
+    }
+
+    function recomputeRioPath() {
+        if (!currentRioSnap) return;
+        const km = parseFloat(rioExtensaoKmInput.value) || 10;
+        const snap = currentRioSnap;
+
+        let path;
+        if (rioDirecao === 'jusante') {
+            path = traceRio(snap.segIdx, snap.distAlongKm, 'jusante', km);
+        } else if (rioDirecao === 'montante') {
+            path = traceRio(snap.segIdx, snap.distAlongKm, 'montante', km).reverse();
+        } else { // ambas
+            const up = traceRio(snap.segIdx, snap.distAlongKm, 'montante', km).reverse();
+            const down = traceRio(snap.segIdx, snap.distAlongKm, 'jusante', km);
+            if (up.length && down.length && pointsEqual([up[up.length - 1][1], up[up.length - 1][0]], [down[0][1], down[0][0]])) {
+                path = up.concat(down.slice(1));
+            } else {
+                path = up.concat(down);
+            }
+        }
+
+        if (!path || path.length < 2) {
+            rioSnapWarn.textContent = 'Não foi possível traçar o trecho pedido a partir desse ponto (rede de rios termina antes do km definido).';
+            rioSnapWarn.style.display = 'block';
+        }
+        currentRioPath = path;
+        recomputeCurrentAnalysis();
+    }
+
+    rioMarkBtn.addEventListener('click', () => {
+        const lat = parseFloat(rioLatInput.value);
+        const lng = parseFloat(rioLngInput.value);
+        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            rioSnapWarn.textContent = 'Coordenadas inválidas. Use formato decimal, ex: -10.493305.';
+            rioSnapWarn.style.display = 'block';
+            return;
+        }
+        runRioAnalysis(lat, lng);
+    });
+    [rioLatInput, rioLngInput].forEach(el => {
+        el.addEventListener('keydown', (e) => { if (e.key === 'Enter') rioMarkBtn.click(); });
+    });
+
+    rioExampleBtn.addEventListener('click', () => {
+        rioLatInput.value = EXEMPLO_BARRAGEM_ALGODOES.lat;
+        rioLngInput.value = EXEMPLO_BARRAGEM_ALGODOES.lng;
+        runRioAnalysis(EXEMPLO_BARRAGEM_ALGODOES.lat, EXEMPLO_BARRAGEM_ALGODOES.lng);
+    });
+
+    document.querySelectorAll('input[name="rioDirecao"]').forEach(r => {
+        r.addEventListener('change', (e) => {
+            if (!e.target.checked) return;
+            rioDirecao = e.target.value;
+            document.querySelectorAll('#rioDirecaoGroup label').forEach(l => {
+                l.classList.toggle('active', l.dataset.value === rioDirecao);
+            });
+            recomputeRioPath();
+        });
+    });
+
+    const debouncedRioRecompute = debounce(() => recomputeRioPath(), 250);
+    rioExtensaoKmInput.addEventListener('input', debouncedRioRecompute);
+    rioExtensaoKmInput.addEventListener('change', () => recomputeRioPath());
+    rioBufferMInput.addEventListener('input', () => recomputeCurrentAnalysis());
+    rioBufferMInput.addEventListener('change', () => recomputeCurrentAnalysis());
+
+    // ============================================================
     // Troca de modo (raio/buffer vs seleção manual)
     // ============================================================
     function setAnalysisMode(mode) {
@@ -2255,7 +2757,10 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         bufferControlsEl.style.display = (mode === 'buffer') ? 'block' : 'none';
         manualControlsEl.style.display = (mode === 'manual') ? 'block' : 'none';
         municipioControlsEl.style.display = (mode === 'municipio') ? 'block' : 'none';
+        document.getElementById('rioControls').style.display = (mode === 'rio') ? 'block' : 'none';
         document.getElementById('situacaoPanel').style.display = (mode === 'manual') ? 'none' : 'block';
+
+        if (mode === 'rio') resetRioState();
     }
 
     document.querySelectorAll('input[name="analysisModeRadio"]').forEach(r => {
@@ -2308,13 +2813,33 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         if (!activeData || !currentMode) return;
 
         const radiusMeters = getRadiusMeters();
-        document.getElementById('radiusDisplay').textContent = radiusMeters + 'm';
+        if (currentMode !== 'rio-trace') {
+            document.getElementById('radiusDisplay').textContent = radiusMeters + 'm';
+        }
         zoneLayerGroup.clearLayers();
 
         let analysisGeometries = [];
         let extraDetail = '';
 
-        if (currentMode === 'point' && currentPoint) {
+        if (currentMode === 'rio-trace' && currentRioPath && currentRioPath.length > 1) {
+            const bufferMeters = getRioBufferMeters();
+            document.getElementById('radiusDisplay').textContent = bufferMeters + 'm';
+            const lineCoords = currentRioPath.map(([lat, lng]) => [lng, lat]);
+            const lineFeature = turf.lineString(lineCoords);
+            const totalKm = turf.length(lineFeature, { units: 'kilometers' });
+            let buffered;
+            try {
+                buffered = turf.buffer(lineFeature, bufferMeters / 1000, { units: 'kilometers' });
+            } catch (e) {
+                console.warn('Falha ao gerar buffer do trecho de rio:', e.message);
+                return;
+            }
+            analysisGeometries = [buffered];
+            L.polyline(currentRioPath, { color: '#0e5a47', weight: 3.5 }).addTo(zoneLayerGroup);
+            L.geoJSON(buffered, { style: ZONE_STYLE }).addTo(zoneLayerGroup);
+            extraDetail = `<div style="margin-bottom:6px;">Trecho seguido no rio: <strong>${totalKm.toFixed(2)} km</strong> · Faixa de influência: <strong>${bufferMeters} m</strong> de cada lado</div>`;
+
+        } else if (currentMode === 'point' && currentPoint) {
             const circle = turf.circle([currentPoint.lng, currentPoint.lat], radiusMeters / 1000, { steps: 64, units: 'kilometers' });
             analysisGeometries = [circle];
             L.geoJSON(circle, { style: ZONE_STYLE }).addTo(zoneLayerGroup);
@@ -2425,11 +2950,14 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     });
 
     // ============================================================
-    // Clique no mapa (só atua no modo raio/buffer)
+    // Clique no mapa (modo raio/buffer ou modo trecho de rio)
     // ============================================================
     map.on('click', (e) => {
-        if (analysisMode !== 'buffer') return;
-        analyzePoint(e.latlng.lat, e.latlng.lng);
+        if (analysisMode === 'buffer') {
+            analyzePoint(e.latlng.lat, e.latlng.lng);
+        } else if (analysisMode === 'rio') {
+            runRioAnalysis(e.latlng.lat, e.latlng.lng);
+        }
     });
 
     // ============================================================
@@ -3092,6 +3620,19 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 
         loadLayer(currentLayerKey);
         populateMunicipioSelect();
+        renderRiosPrincipaisReferencia();
+    }
+
+    // Camada de referência visual: rios principais do Piauí (sempre visíveis,
+    // por baixo de tudo, sem interação — apenas contexto pra localizar a
+    // barragem/trecho em relação aos grandes rios do estado).
+    const riosPrincipaisLayerGroup = L.layerGroup().addTo(map);
+    function renderRiosPrincipaisReferencia() {
+        if (typeof RIOS_PRINCIPAIS === 'undefined') return;
+        RIOS_PRINCIPAIS.forEach(coords => {
+            const latlngs = coords.map(([lon, lat]) => [lat, lon]);
+            L.polyline(latlngs, { color: '#6fa8c9', weight: 1.6, opacity: 0.55 }).addTo(riosPrincipaisLayerGroup);
+        });
     }
 
     initializeApp();
