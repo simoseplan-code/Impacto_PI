@@ -486,11 +486,20 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 #map { height: 100%; width: 100%; }
 
 .legend {
-    position: absolute; bottom: 16px; right: 16px; background: rgba(255,255,255,0.96);
+    position: absolute; bottom: 16px; right: 16px; background: rgba(255,255,255,0.97);
     border-radius: 9px; padding: 10px 12px; font-size: 11px; color: var(--ink-soft);
     box-shadow: 0 1px 4px rgba(0,0,0,0.15); z-index: 500; line-height: 1.6;
+    max-width: 210px;
+}
+.legend-title {
+    font-family: var(--font-display); font-weight: 700; font-size: 11.5px;
+    color: var(--ink); margin-bottom: 6px; letter-spacing: 0.02em; text-transform: uppercase;
 }
 .legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+.legend-toggle input { margin: 0; cursor: pointer; accent-color: var(--teal); }
+.legend-static { color: var(--muted); }
+.legend-divider { border: none; border-top: 1px solid var(--line); margin: 6px 0; }
 .legend-swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
 
 @media (max-width: 900px) {
@@ -705,11 +714,6 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             <div class="hint" style="margin-top:10px;">Dados exatos de sexo e idade do Censo 2022, na granularidade da base selecionada acima (setor, bairro ou município).</div>
         </div>
 
-        <label class="checkbox-row">
-            <input type="checkbox" id="showUnits" checked />
-            <span id="showUnitsLabel">Mostrar divisão (setor censitário)</span>
-        </label>
-
         <div id="result" class="result-card">
             <div class="crop-mark tl"></div>
             <div class="crop-mark br"></div>
@@ -785,12 +789,22 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     <div class="map-container">
         <div id="map"></div>
         <div class="legend">
-            <div class="legend-item"><span class="legend-swatch" style="background:#f2f2f2; border:1px solid #bbb;"></span> <span id="legendUnitLabel">Setor censitário</span></div>
-            <div class="legend-item"><span class="legend-swatch" style="background:#157a61; opacity:0.5;"></span> <span id="legendUnitHighlightLabel">Setor contabilizado</span></div>
-            <div class="legend-item"><span class="legend-swatch" style="background:transparent; border:2px dashed #157a61;"></span> Área de influência</div>
-            <div class="legend-item"><span class="legend-swatch" style="background:#d9632a;"></span> Geometria importada</div>
-            <div class="legend-item"><span class="legend-swatch" style="background:transparent; border-top:2px solid #6fa8c9;"></span> Rios principais (referência)</div>
-            <div class="legend-item"><span class="legend-swatch" style="background:transparent; border-top:2.5px solid #0e5a47;"></span> Trecho de rio seguido</div>
+            <div class="legend-title">Camadas</div>
+            <label class="legend-toggle">
+                <input type="checkbox" id="legendToggleUnits" />
+                <span class="legend-swatch" style="background:#f2f2f2; border:1px solid #bbb;"></span>
+                <span id="legendUnitLabel">Setor censitário</span>
+            </label>
+            <label class="legend-toggle" style="margin-top:4px;">
+                <input type="checkbox" id="legendToggleRios" />
+                <span class="legend-swatch" style="background:transparent; border-top:2px solid #6fa8c9;"></span>
+                Rios principais (referência)
+            </label>
+            <hr class="legend-divider" />
+            <div class="legend-item legend-static"><span class="legend-swatch" style="background:#157a61; opacity:0.5;"></span> <span id="legendUnitHighlightLabel">Setor contabilizado</span></div>
+            <div class="legend-item legend-static"><span class="legend-swatch" style="background:transparent; border:2px dashed #157a61;"></span> Área de influência</div>
+            <div class="legend-item legend-static"><span class="legend-swatch" style="background:#d9632a;"></span> Geometria importada</div>
+            <div class="legend-item legend-static"><span class="legend-swatch" style="background:transparent; border-top:2.5px solid #0e5a47;"></span> Trecho de rio seguido</div>
         </div>
     </div>
 </div>
@@ -931,9 +945,13 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     // ============================================================
     const map = L.map('map', { preferCanvas: true }).setView([-6.84, -43.2], 7);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        maxZoom: 19
+    // Basemap mais limpo (CartoDB Positron): sem os polígonos/rótulos de terras
+    // indígenas, áreas de proteção ambiental e regiões geográficas intermediárias
+    // que o tile padrão do OSM mostra e que poluíam o mapa.
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap © CARTO',
+        maxZoom: 19,
+        subdomains: 'abcd'
     }).addTo(map);
 
     const referenceLayerGroup = L.layerGroup().addTo(map);
@@ -950,7 +968,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     const kmlFileInput = document.getElementById('kmlFile');
     const importStatus = document.getElementById('importStatus');
     const clearImportBtn = document.getElementById('clearImportBtn');
-    const showUnitsCheckbox = document.getElementById('showUnits');
+    const showUnitsCheckbox = document.getElementById('legendToggleUnits');
     const modeBadge = document.getElementById('modeBadge');
     const layerSelect = document.getElementById('layerSelect');
     const clearSelectionBtn = document.getElementById('clearSelectionBtn');
@@ -1091,7 +1109,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     // ============================================================
     function updateLayerUI() {
         const config = LAYER_CONFIGS[currentLayerKey];
-        document.getElementById('showUnitsLabel').textContent = `Mostrar divisão (${config.label.toLowerCase()})`;
+        document.getElementById('legendUnitLabel').textContent = config.label;
         document.getElementById('legendUnitLabel').textContent = config.label;
         document.getElementById('legendUnitHighlightLabel').textContent = `${config.label} contabilizado`;
         document.getElementById('unitsCountLabel').textContent = `${capitalize(config.unitPlural)} encontrados:`;
@@ -3057,6 +3075,18 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     showUnitsCheckbox.addEventListener('change', () => setUnitsVisibility(showUnitsCheckbox.checked));
 
     // ============================================================
+    // Visibilidade da camada de referência "Rios principais"
+    // ============================================================
+    const legendToggleRios = document.getElementById('legendToggleRios');
+    legendToggleRios.addEventListener('change', () => {
+        if (legendToggleRios.checked) {
+            if (!map.hasLayer(riosPrincipaisLayerGroup)) riosPrincipaisLayerGroup.addTo(map);
+        } else {
+            if (map.hasLayer(riosPrincipaisLayerGroup)) map.removeLayer(riosPrincipaisLayerGroup);
+        }
+    });
+
+    // ============================================================
     // Remover importação
     // ============================================================
     clearImportBtn.addEventListener('click', () => {
@@ -3706,7 +3736,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     // Camada de referência visual: rios principais do Piauí (sempre visíveis,
     // por baixo de tudo, sem interação — apenas contexto pra localizar a
     // barragem/trecho em relação aos grandes rios do estado).
-    const riosPrincipaisLayerGroup = L.layerGroup().addTo(map);
+    const riosPrincipaisLayerGroup = L.layerGroup();
     function renderRiosPrincipaisReferencia() {
         if (typeof RIOS_PRINCIPAIS === 'undefined') return;
         RIOS_PRINCIPAIS.forEach(coords => {
