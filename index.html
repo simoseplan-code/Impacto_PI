@@ -990,6 +990,10 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 
     const referenceLayerGroup = L.layerGroup().addTo(map);
     const zoneLayerGroup = L.layerGroup().addTo(map);
+    const riosPrincipaisLayerGroup = L.layerGroup();
+    const todasBarragensLayerGroup = L.layerGroup();
+    const baciasHidrograficasLayerGroup = L.layerGroup();
+    const estacoesChuvaLayerGroup = L.layerGroup();
 
     // ============================================================
     // Referências de DOM
@@ -2116,7 +2120,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
                 if (currentBarragemOficial.volume_hm3) params.push(['Capacidade do reservatório', fmtNum(currentBarragemOficial.volume_hm3, 1) + ' hm³']);
                 if (currentBarragemOficial.area_km2) params.push(["Espelho d'água", fmtNum(currentBarragemOficial.area_km2, 2) + ' km²']);
                 if (currentBarragemOficial.bacia_area_km2) params.push(['Área de drenagem do açude', fmtNum(currentBarragemOficial.bacia_area_km2, 0) + ' km²']);
-                if (currentBarragemOficial.municipios) params.push(['Município(s) do açude', currentBarragemOficial.municipios.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())]);
+                if (currentBarragemOficial.municipios) params.push(['Município(s) do açude', toTitleCasePtBr(currentBarragemOficial.municipios)]);
                 if (currentBarragemOficial.dominio) params.push(['Domínio', currentBarragemOficial.dominio]);
                 if (currentBarragemOficial.uso) params.push(['Uso principal', currentBarragemOficial.uso]);
             } else {
@@ -2752,6 +2756,14 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         return ordem ? `ordem ${ordem} (Strahler)` : 'ordem não informada';
     }
 
+    function toTitleCasePtBr(s) {
+        if (!s) return s;
+        return s.toLowerCase().split(/(\s+|-)/).map(part => {
+            if (/^\s+$|^-$/.test(part)) return part;
+            return part.charAt(0).toUpperCase() + part.slice(1);
+        }).join('');
+    }
+
     function fmtNum(v, decimals) {
         if (v === null || v === undefined || isNaN(v)) return '—';
         return v.toLocaleString('pt-BR', { minimumFractionDigits: decimals || 0, maximumFractionDigits: decimals || 0 });
@@ -2799,7 +2811,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         if (barragem.area_km2) partes.push(`Espelho d'água: <strong>${fmtNum(barragem.area_km2, 2)} km²</strong>`);
         if (barragem.bacia_area_km2) partes.push(`Área de drenagem (bacia do açude): <strong>${fmtNum(barragem.bacia_area_km2, 0)} km²</strong>`);
         if (baciaOficial) partes.push(`Bacia hidrográfica oficial: <strong>${baciaOficial.nome}</strong>`);
-        if (barragem.municipios) partes.push(`Município(s): ${barragem.municipios.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}`);
+        if (barragem.municipios) partes.push(`Município(s): ${toTitleCasePtBr(barragem.municipios)}`);
         if (barragem.dominio) partes.push(`Domínio: ${barragem.dominio}`);
         if (barragem.uso) partes.push(`Uso principal: ${barragem.uso}`);
         if (partes.length) {
@@ -3946,7 +3958,6 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     // Camada de referência visual: rios principais do Piauí (sempre visíveis,
     // por baixo de tudo, sem interação — apenas contexto pra localizar a
     // barragem/trecho em relação aos grandes rios do estado).
-    const riosPrincipaisLayerGroup = L.layerGroup();
     function renderRiosPrincipaisReferencia() {
         if (typeof RIOS_PRINCIPAIS === 'undefined') return;
         RIOS_PRINCIPAIS.forEach(coords => {
@@ -3960,10 +3971,6 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     // hidrográficas oficiais do estado e estações pluviométricas
     // (dados do PERH-PI / SEMAR).
     // ============================================================
-    const todasBarragensLayerGroup = L.layerGroup();
-    const baciasHidrograficasLayerGroup = L.layerGroup();
-    const estacoesChuvaLayerGroup = L.layerGroup();
-
     function renderTodasBarragens() {
         if (typeof BARRAGENS_PIAUI === 'undefined') return;
         BARRAGENS_PIAUI.forEach((b, idx) => {
