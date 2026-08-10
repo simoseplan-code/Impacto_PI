@@ -643,13 +643,25 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         <div id="rioControls" style="display:none;">
             <div class="panel">
                 <div class="panel-head"><span class="panel-tick"></span><h2>Local da barragem</h2></div>
-                <div class="hint" style="margin-top:0;">Clique no mapa perto do rio ou informe as coordenadas. O ponto é ajustado (“snapado”) automaticamente para o curso d'água mais próximo.</div>
-                <div class="coord-grid" style="margin-top:10px;">
+                <div class="hint" style="margin-top:0;">Escolha uma barragem/açude oficial (PERH-PI/SEMAR), clique no mapa, informe coordenadas ou importe um KML/KMZ. O ponto é ajustado (“snapado”) automaticamente para o curso d'água mais próximo.</div>
+                <div class="field" style="margin-top:10px;">
+                    <label for="rioBarragemSelect">Barragem / açude oficial (PERH-PI)</label>
+                    <select id="rioBarragemSelect">
+                        <option value="">Selecione uma barragem...</option>
+                    </select>
+                </div>
+                <div class="rio-snap-info" id="rioOficialInfo" style="display:none;"></div>
+                <div class="hint" style="margin:10px 0 4px;">Ou informe manualmente:</div>
+                <div class="coord-grid">
                     <div class="field"><label for="rioLatInput">Latitude</label><input type="text" id="rioLatInput" placeholder="-10.493305" /></div>
                     <div class="field"><label for="rioLngInput">Longitude</label><input type="text" id="rioLngInput" placeholder="-44.856473" /></div>
                 </div>
                 <button class="btn btn-primary" id="rioMarkBtn">Marcar no mapa</button>
-                <button class="btn btn-example" id="rioExampleBtn">📍 Carregar exemplo: Barragem Nova Algodões</button>
+                <div class="field" style="margin-top:10px;">
+                    <label for="rioKmlFile">Ou importar KML / KMZ (ponto da barragem)</label>
+                    <input type="file" id="rioKmlFile" accept=".kml,.kmz" />
+                </div>
+                <div class="import-status" id="rioImportStatus"></div>
                 <div class="rio-snap-info" id="rioSnapInfo" style="display:none;"></div>
                 <div class="rio-snap-warn" id="rioSnapWarn" style="display:none;"></div>
             </div>
@@ -800,11 +812,30 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
                 <span class="legend-swatch" style="background:transparent; border-top:2px solid #6fa8c9;"></span>
                 Rios principais (referência)
             </label>
+            <div id="legendBarragensToggles">
+                <label class="legend-toggle" style="margin-top:4px;">
+                    <input type="checkbox" id="legendToggleBarragensTodas" />
+                    <span class="legend-swatch" style="background:#1f6fb2; border-radius:50%;"></span>
+                    Açudes/barragens (todos)
+                </label>
+                <label class="legend-toggle" style="margin-top:4px;">
+                    <input type="checkbox" id="legendToggleBacias" />
+                    <span class="legend-swatch" style="background:transparent; border:1.5px dashed #8a6d3b;"></span>
+                    Bacias hidrográficas oficiais
+                </label>
+                <label class="legend-toggle" style="margin-top:4px;">
+                    <input type="checkbox" id="legendToggleChuva" />
+                    <span class="legend-swatch" style="background:#2e9e6b; border-radius:50%;"></span>
+                    Estações pluviométricas
+                </label>
+            </div>
             <hr class="legend-divider" />
             <div class="legend-item legend-static"><span class="legend-swatch" style="background:#157a61; opacity:0.5;"></span> <span id="legendUnitHighlightLabel">Setor contabilizado</span></div>
             <div class="legend-item legend-static"><span class="legend-swatch" style="background:transparent; border:2px dashed #157a61;"></span> Área de influência</div>
             <div class="legend-item legend-static"><span class="legend-swatch" style="background:#d9632a;"></span> Geometria importada</div>
             <div class="legend-item legend-static"><span class="legend-swatch" style="background:transparent; border-top:2.5px solid #0e5a47;"></span> Trecho de rio seguido</div>
+            <div class="legend-item legend-static" id="legendEspelhoItem" style="display:none;"><span class="legend-swatch" style="background:#4a9fd8; opacity:0.5;"></span> Espelho d'água oficial</div>
+            <div class="legend-item legend-static" id="legendBaciaAcudeItem" style="display:none;"><span class="legend-swatch" style="background:transparent; border:1.5px dashed #a8651a;"></span> Bacia do açude selecionado</div>
         </div>
     </div>
 </div>
@@ -825,6 +856,9 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 <script src="piaui_domicilios_municipio.js"></script>
 <script src="piaui_cursos_dagua.js"></script>
 <script src="piaui_rios_principais.js"></script>
+<script src="piaui_barragens.js"></script>
+<script src="piaui_bacias_hidrograficas.js"></script>
+<script src="piaui_estacoes_pluviometricas.js"></script>
 <script>
     // ============================================================
     // Configuração das bases disponíveis
@@ -980,7 +1014,10 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     const rioLatInput = document.getElementById('rioLatInput');
     const rioLngInput = document.getElementById('rioLngInput');
     const rioMarkBtn = document.getElementById('rioMarkBtn');
-    const rioExampleBtn = document.getElementById('rioExampleBtn');
+    const rioKmlFileInput = document.getElementById('rioKmlFile');
+    const rioImportStatus = document.getElementById('rioImportStatus');
+    const rioBarragemSelect = document.getElementById('rioBarragemSelect');
+    const rioOficialInfo = document.getElementById('rioOficialInfo');
     const rioSnapInfo = document.getElementById('rioSnapInfo');
     const rioSnapWarn = document.getElementById('rioSnapWarn');
     const rioParamsPanel = document.getElementById('rioParamsPanel');
@@ -2047,7 +2084,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         const situacaoForcaSetor = (selectedSituacao.size < 2) && (currentLayerKey !== 'setor') && (countMethod !== 'domicilios');
         const params = [];
         params.push(['Base de dados', config.label + (situacaoForcaSetor ? ' (calculado por Setor censitário — filtro urbano/rural ativo)' : '')]);
-        params.push(['Modo de seleção', 'Raio / buffer']);
+        params.push(['Modo de seleção', currentMode === 'rio-trace' ? 'Trecho de rio (barragem)' : 'Raio / buffer']);
 
         if (currentMode === 'point' && currentPoint) {
             params.push(['Geometria', 'Ponto manual']);
@@ -2068,6 +2105,30 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             if (lastImportedFileName) params.push(['Arquivo importado', lastImportedFileName]);
             params.push(['Polígonos no arquivo', String(currentPolygons.length)]);
             params.push(['Raio adicional', 'Não se aplica (área definida pelo polígono)']);
+        } else if (currentMode === 'rio-trace' && currentRioSnap) {
+            const bufferMeters = getRioBufferMeters();
+            const totalKm = currentRioPath && currentRioPath.length > 1
+                ? turf.length(turf.lineString(currentRioPath.map(([lat, lng]) => [lng, lat])), { units: 'kilometers' })
+                : 0;
+            params.push(['Geometria', 'Trecho de rio a partir de barragem/açude']);
+            if (currentBarragemOficial) {
+                params.push(['Barragem/açude', currentBarragemOficial.nome + ' (PERH-PI/SEMAR)']);
+                if (currentBarragemOficial.volume_hm3) params.push(['Capacidade do reservatório', fmtNum(currentBarragemOficial.volume_hm3, 1) + ' hm³']);
+                if (currentBarragemOficial.area_km2) params.push(["Espelho d'água", fmtNum(currentBarragemOficial.area_km2, 2) + ' km²']);
+                if (currentBarragemOficial.bacia_area_km2) params.push(['Área de drenagem do açude', fmtNum(currentBarragemOficial.bacia_area_km2, 0) + ' km²']);
+                if (currentBarragemOficial.municipios) params.push(['Município(s) do açude', currentBarragemOficial.municipios.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())]);
+                if (currentBarragemOficial.dominio) params.push(['Domínio', currentBarragemOficial.dominio]);
+                if (currentBarragemOficial.uso) params.push(['Uso principal', currentBarragemOficial.uso]);
+            } else {
+                params.push(['Ponto de partida', 'Informado manualmente (não consta na lista oficial PERH-PI)']);
+            }
+            if (currentBaciaOficial) params.push(['Bacia hidrográfica oficial (PERH-PI)', currentBaciaOficial.nome]);
+            params.push(['Coordenadas do ponto', `${currentRioPoint.lat.toFixed(6)}, ${currentRioPoint.lng.toFixed(6)}`]);
+            params.push(['Ajuste ao curso d\'água (snap)', `${(currentRioSnap.distKm * 1000).toFixed(0)} m`]);
+            params.push(['Direção seguida', { jusante: 'Jusante (rio abaixo)', montante: 'Montante (rio acima)', ambas: 'Ambas as direções' }[rioDirecao] || rioDirecao]);
+            params.push(['Extensão pedida', (parseFloat(rioExtensaoKmInput.value) || 0) + ' km' + (rioDirecao === 'ambas' ? ' (por direção)' : '')]);
+            params.push(['Extensão real traçada', totalKm.toFixed(2) + ' km']);
+            params.push(['Faixa de influência (buffer)', bufferMeters + ' m de cada lado do trecho']);
         }
 
         params.push(['Metodologia de contagem', countMethod === 'proportional'
@@ -2392,9 +2453,10 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     let currentRioPoint = null;     // { lat, lng } ponto original clicado/informado
     let currentRioSnap = null;      // { segIdx, distAlongKm, snapLat, snapLng, distSnapM, ordem, areaKm2 }
     let rioDirecao = 'jusante';     // 'jusante' | 'montante' | 'ambas'
+    let currentBarragemOficial = null; // dado oficial PERH-PI/SNISB, quando selecionado via dropdown/marcador
+    let currentBaciaOficial = null;    // bacia hidrográfica oficial que contém o ponto atual
 
-    const EXEMPLO_BARRAGEM_ALGODOES = { lat: -3.491581, lng: -41.427012, nome: 'Barragem Nova Algodões' };
-
+    
     // ---- Decodificação lazy dos dados binários da rede de rios ----
     let RIOS_COORDS_F32 = null;   // Float32Array [lon,lat,lon,lat,...]
     let RIOS_OFFSETS_I32 = null;  // Int32Array, offsets[i]..offsets[i+1] = pontos do segmento i
@@ -2678,6 +2740,10 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         rioSnapInfo.style.display = 'none';
         rioSnapWarn.style.display = 'none';
         rioParamsPanel.style.display = 'none';
+        rioOficialInfo.style.display = 'none';
+        rioBarragemSelect.value = '';
+        currentBarragemOficial = null;
+        currentBaciaOficial = null;
         rioLatInput.value = '';
         rioLngInput.value = '';
     }
@@ -2685,6 +2751,82 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     function formatOrdemRio(ordem) {
         return ordem ? `ordem ${ordem} (Strahler)` : 'ordem não informada';
     }
+
+    function fmtNum(v, decimals) {
+        if (v === null || v === undefined || isNaN(v)) return '—';
+        return v.toLocaleString('pt-BR', { minimumFractionDigits: decimals || 0, maximumFractionDigits: decimals || 0 });
+    }
+
+    // ---- Seletor de barragem/açude oficial (PERH-PI / SEMAR) ----
+    function populateBarragemSelect() {
+        if (typeof BARRAGENS_PIAUI === 'undefined') return;
+        BARRAGENS_PIAUI.forEach((b, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = b.nome + (b.volume_hm3 ? ` (${fmtNum(b.volume_hm3, 1)} hm³)` : '');
+            rioBarragemSelect.appendChild(opt);
+        });
+    }
+
+    function drawBarragemOficial(barragem) {
+        document.getElementById('legendEspelhoItem').style.display = 'none';
+        document.getElementById('legendBaciaAcudeItem').style.display = 'none';
+
+        if (barragem.rings && barragem.rings.length) {
+            barragem.rings.forEach(ring => {
+                const latlngs = ring.map(([lon, lat]) => [lat, lon]);
+                L.polygon(latlngs, { color: '#1f6fb2', weight: 1.5, fillColor: '#4a9fd8', fillOpacity: 0.35 })
+                    .bindPopup(`<strong>${barragem.nome}</strong><br>Espelho d'água oficial (SNISB)`)
+                    .addTo(referenceLayerGroup);
+            });
+            document.getElementById('legendEspelhoItem').style.display = 'flex';
+        }
+
+        if (barragem.bacia_rings && barragem.bacia_rings.length) {
+            barragem.bacia_rings.forEach(ring => {
+                const latlngs = ring.map(([lon, lat]) => [lat, lon]);
+                L.polygon(latlngs, { color: '#a8651a', weight: 1.5, dashArray: '6,4', fillOpacity: 0.02 })
+                    .bindPopup(`<strong>Bacia de drenagem — ${barragem.nome}</strong><br>Área de contribuição: ${fmtNum(barragem.bacia_area_km2, 0)} km²`)
+                    .addTo(referenceLayerGroup);
+            });
+            document.getElementById('legendBaciaAcudeItem').style.display = 'flex';
+        }
+
+        const baciaOficial = findBaciaHidrografica(barragem.lat, barragem.lng);
+
+        const partes = [];
+        if (barragem.volume_hm3) partes.push(`Capacidade: <strong>${fmtNum(barragem.volume_hm3, 1)} hm³</strong>`);
+        if (barragem.area_km2) partes.push(`Espelho d'água: <strong>${fmtNum(barragem.area_km2, 2)} km²</strong>`);
+        if (barragem.bacia_area_km2) partes.push(`Área de drenagem (bacia do açude): <strong>${fmtNum(barragem.bacia_area_km2, 0)} km²</strong>`);
+        if (baciaOficial) partes.push(`Bacia hidrográfica oficial: <strong>${baciaOficial.nome}</strong>`);
+        if (barragem.municipios) partes.push(`Município(s): ${barragem.municipios.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}`);
+        if (barragem.dominio) partes.push(`Domínio: ${barragem.dominio}`);
+        if (barragem.uso) partes.push(`Uso principal: ${barragem.uso}`);
+        if (partes.length) {
+            rioOficialInfo.innerHTML = `<strong>${barragem.nome}</strong> — dado oficial PERH-PI/SNISB<br>` + partes.join(' · ');
+            rioOficialInfo.style.display = 'block';
+        } else {
+            rioOficialInfo.innerHTML = `<strong>${barragem.nome}</strong> — barragem estratégica (PERH-PI). Sem dados detalhados de capacidade/área disponíveis para esta unidade.`;
+            rioOficialInfo.style.display = 'block';
+        }
+
+        currentBarragemOficial = barragem;
+        currentBaciaOficial = baciaOficial;
+    }
+
+    rioBarragemSelect.addEventListener('change', () => {
+        const idx = rioBarragemSelect.value;
+        if (idx === '') return;
+        const barragem = BARRAGENS_PIAUI[parseInt(idx, 10)];
+        if (!barragem) return;
+        rioLatInput.value = barragem.lat;
+        rioLngInput.value = barragem.lng;
+        runRioAnalysis(barragem.lat, barragem.lng);
+        drawBarragemOficial(barragem);
+        if (barragem.rings && barragem.rings.length) {
+            fitToLayerGroups([referenceLayerGroup]);
+        }
+    });
 
     function runRioAnalysis(lat, lng) {
         clearAnalysisLayers();
@@ -2717,8 +2859,11 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         }
 
         const meta = RIOS_META[snap.segIdx] || [0, 0, 0, 0];
+        const baciaOf = findBaciaHidrografica(lat, lng);
+        if (!currentBaciaOficial) currentBaciaOficial = baciaOf;
         rioSnapInfo.innerHTML = `Ponto ajustado ao curso d'água mais próximo — <strong>${(snap.distKm * 1000).toFixed(0)} m</strong> do local informado.<br>` +
-            `Trecho local: ${formatOrdemRio(meta[2])}, área de bacia acumulada ≈ <strong>${fmt(Math.round(meta[1]))} km²</strong>.`;
+            `Trecho local: ${formatOrdemRio(meta[2])}, área de bacia acumulada ≈ <strong>${fmt(Math.round(meta[1]))} km²</strong>.` +
+            (baciaOf ? `<br>Bacia hidrográfica oficial (PERH-PI): <strong>${baciaOf.nome}</strong>.` : '');
         rioSnapInfo.style.display = 'block';
         rioSnapWarn.style.display = (snap.distKm > 1) ? 'block' : 'none';
         if (snap.distKm > 1) {
@@ -2773,16 +2918,45 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             rioSnapWarn.style.display = 'block';
             return;
         }
+        rioBarragemSelect.value = '';
+        rioOficialInfo.style.display = 'none';
+        currentBarragemOficial = null;
+        currentBaciaOficial = null;
         runRioAnalysis(lat, lng);
     });
     [rioLatInput, rioLngInput].forEach(el => {
         el.addEventListener('keydown', (e) => { if (e.key === 'Enter') rioMarkBtn.click(); });
     });
 
-    rioExampleBtn.addEventListener('click', () => {
-        rioLatInput.value = EXEMPLO_BARRAGEM_ALGODOES.lat;
-        rioLngInput.value = EXEMPLO_BARRAGEM_ALGODOES.lng;
-        runRioAnalysis(EXEMPLO_BARRAGEM_ALGODOES.lat, EXEMPLO_BARRAGEM_ALGODOES.lng);
+    rioKmlFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        rioImportStatus.classList.add('active');
+        rioImportStatus.textContent = 'Lendo arquivo...';
+        try {
+            let kmlText;
+            if (file.name.toLowerCase().endsWith('.kmz')) {
+                const buffer = await file.arrayBuffer();
+                kmlText = await extractKmlFromKmz(buffer);
+            } else {
+                kmlText = await file.text();
+            }
+            const parsed = parseKML(kmlText);
+            if (!parsed.points.length) {
+                rioImportStatus.textContent = `Não foi encontrado nenhum ponto em "${file.name}".`;
+                return;
+            }
+            const [lat, lng] = parsed.points[0];
+            rioImportStatus.textContent = `"${file.name}" importado — ponto encontrado em ${lat.toFixed(6)}, ${lng.toFixed(6)}.`;
+            rioBarragemSelect.value = '';
+            rioOficialInfo.style.display = 'none';
+            currentBarragemOficial = null;
+            currentBaciaOficial = null;
+            runRioAnalysis(lat, lng);
+        } catch (err) {
+            console.error(err);
+            rioImportStatus.textContent = 'Erro ao processar o arquivo: ' + err.message;
+        }
     });
 
     document.querySelectorAll('input[name="rioDirecao"]').forEach(r => {
@@ -2855,6 +3029,17 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         } else {
             const checkedRadio = document.querySelector('input[name="analysisModeRadio"]:checked');
             setAnalysisMode(checkedRadio ? checkedRadio.value : 'buffer');
+        }
+
+        document.getElementById('legendBarragensToggles').style.display = (tab === 'barragens') ? 'block' : 'none';
+        if (tab !== 'barragens') {
+            // some camadas só fazem sentido dentro da aba Barragens
+            [todasBarragensLayerGroup, baciasHidrograficasLayerGroup, estacoesChuvaLayerGroup].forEach(lg => {
+                if (map.hasLayer(lg)) map.removeLayer(lg);
+            });
+            document.getElementById('legendToggleBarragensTodas').checked = false;
+            document.getElementById('legendToggleBacias').checked = false;
+            document.getElementById('legendToggleChuva').checked = false;
         }
     }
 
@@ -3054,6 +3239,10 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         if (analysisMode === 'buffer') {
             analyzePoint(e.latlng.lat, e.latlng.lng);
         } else if (analysisMode === 'rio') {
+            rioBarragemSelect.value = '';
+            rioOficialInfo.style.display = 'none';
+            currentBarragemOficial = null;
+            currentBaciaOficial = null;
             runRioAnalysis(e.latlng.lat, e.latlng.lng);
         }
     });
@@ -3085,6 +3274,23 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             if (map.hasLayer(riosPrincipaisLayerGroup)) map.removeLayer(riosPrincipaisLayerGroup);
         }
     });
+
+    // ============================================================
+    // Visibilidade das camadas extras da aba Barragens
+    // ============================================================
+    function wireLayerToggle(checkboxId, layerGroup) {
+        const el = document.getElementById(checkboxId);
+        el.addEventListener('change', () => {
+            if (el.checked) {
+                if (!map.hasLayer(layerGroup)) layerGroup.addTo(map);
+            } else {
+                if (map.hasLayer(layerGroup)) map.removeLayer(layerGroup);
+            }
+        });
+    }
+    wireLayerToggle('legendToggleBarragensTodas', todasBarragensLayerGroup);
+    wireLayerToggle('legendToggleBacias', baciasHidrograficasLayerGroup);
+    wireLayerToggle('legendToggleChuva', estacoesChuvaLayerGroup);
 
     // ============================================================
     // Remover importação
@@ -3731,6 +3937,10 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         loadLayer(currentLayerKey);
         populateMunicipioSelect();
         renderRiosPrincipaisReferencia();
+        populateBarragemSelect();
+        renderTodasBarragens();
+        renderBaciasHidrograficas();
+        renderEstacoesChuva();
     }
 
     // Camada de referência visual: rios principais do Piauí (sempre visíveis,
@@ -3743,6 +3953,78 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             const latlngs = coords.map(([lon, lat]) => [lat, lon]);
             L.polyline(latlngs, { color: '#6fa8c9', weight: 1.6, opacity: 0.55 }).addTo(riosPrincipaisLayerGroup);
         });
+    }
+
+    // ============================================================
+    // Camadas extras da aba Barragens: todos os açudes, bacias
+    // hidrográficas oficiais do estado e estações pluviométricas
+    // (dados do PERH-PI / SEMAR).
+    // ============================================================
+    const todasBarragensLayerGroup = L.layerGroup();
+    const baciasHidrograficasLayerGroup = L.layerGroup();
+    const estacoesChuvaLayerGroup = L.layerGroup();
+
+    function renderTodasBarragens() {
+        if (typeof BARRAGENS_PIAUI === 'undefined') return;
+        BARRAGENS_PIAUI.forEach((b, idx) => {
+            const cap = b.volume_hm3 ? `${fmtNum(b.volume_hm3, 1)} hm³` : 'capacidade não informada';
+            L.circleMarker([b.lat, b.lng], {
+                radius: 6, color: '#0d4f7a', weight: 1.5, fillColor: '#1f6fb2', fillOpacity: 0.85
+            })
+            .bindPopup(`<strong>${b.nome}</strong><br>${cap}<br><button type="button" class="popup-select-mun-btn" onclick="window.selecionarBarragemNoPopup(${idx})">Analisar esta barragem</button>`)
+            .addTo(todasBarragensLayerGroup);
+        });
+    }
+
+    window.selecionarBarragemNoPopup = function (idx) {
+        rioBarragemSelect.value = idx;
+        rioBarragemSelect.dispatchEvent(new Event('change'));
+    };
+
+    function renderBaciasHidrograficas() {
+        if (typeof BACIAS_HIDROGRAFICAS_PI === 'undefined') return;
+        BACIAS_HIDROGRAFICAS_PI.forEach(b => {
+            b.rings.forEach(ring => {
+                const latlngs = ring.map(([lon, lat]) => [lat, lon]);
+                L.polygon(latlngs, { color: '#8a6d3b', weight: 1.5, dashArray: '5,4', fillOpacity: 0.02 })
+                    .bindPopup(`<strong>${b.nome}</strong><br>Área: ${fmtNum(b.area_km2, 0)} km²`)
+                    .addTo(baciasHidrograficasLayerGroup);
+            });
+        });
+    }
+
+    function renderEstacoesChuva() {
+        if (typeof ESTACOES_PLUVIOMETRICAS_PI === 'undefined') return;
+        ESTACOES_PLUVIOMETRICAS_PI.forEach(e => {
+            L.circleMarker([e.lat, e.lng], {
+                radius: 4, color: '#1c6b47', weight: 1, fillColor: e.operante ? '#2e9e6b' : '#a9a9a9', fillOpacity: 0.85
+            })
+            .bindPopup(`<strong>${e.nome}</strong><br>${e.municipio || ''}<br>Bacia: ${e.bacia || '—'}<br>Operadora: ${e.operadora || '—'} · ${e.operante ? 'em operação' : 'inativa'}`)
+            .addTo(estacoesChuvaLayerGroup);
+        });
+    }
+
+    // Teste ponto-em-polígono (ray casting), pra descobrir em qual bacia
+    // hidrográfica oficial um ponto (ex: uma barragem) está localizado.
+    function pointInRing(lat, lon, ring) {
+        let inside = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            const xi = ring[i][0], yi = ring[i][1];
+            const xj = ring[j][0], yj = ring[j][1];
+            const intersect = ((yi > lat) !== (yj > lat)) &&
+                (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+    function findBaciaHidrografica(lat, lng) {
+        if (typeof BACIAS_HIDROGRAFICAS_PI === 'undefined') return null;
+        for (const b of BACIAS_HIDROGRAFICAS_PI) {
+            for (const ring of b.rings) {
+                if (pointInRing(lat, lng, ring)) return b;
+            }
+        }
+        return null;
     }
 
     initializeApp();
