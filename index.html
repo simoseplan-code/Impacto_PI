@@ -553,6 +553,15 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 <div class="container">
     <div class="sidebar">
 
+        <div class="panel" id="tipologiaPanel">
+            <div class="panel-head"><span class="panel-tick"></span><h2>Tipologia da obra <span style="font-weight:400; opacity:.65;">(opcional)</span></h2></div>
+            <div class="field">
+                <label for="tipologiaSelect">Aplicar preset do Anexo II (metodologia PDB)</label>
+                <select id="tipologiaSelect"></select>
+            </div>
+            <div class="hint" id="tipologiaHint" style="margin-top:8px;"></div>
+        </div>
+
         <div class="panel">
             <div class="panel-head"><span class="panel-tick"></span><h2>Camada de análise</h2></div>
             <div class="field">
@@ -3071,6 +3080,170 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
                 recomputeCurrentAnalysis();
             }
         });
+    });
+
+    // ============================================================
+    // Tipologia da obra — presets do ANEXO II (Metodologia PDB / SEPLAN-PI)
+    // Cada preset aplica a "Regra" da tabela do anexo (base de dados, modo
+    // de seleção, raio/buffer e filtro urbano/rural) com um clique. O texto
+    // de referência cita a seção do anexo e, quando existe, a "Alternativa"
+    // sugerida (que o anexo deixa a critério da setorial, sem cálculo
+    // automático — ex.: nº de vagas × N, limiares populacionais de
+    // hospitais/segurança). Ajuste manual continua livre depois de aplicar.
+    // ============================================================
+    const TIPOLOGIAS = [
+        { group: 'Vias urbanas (§4.1 — raio 200m, imóveis lindeiros, Método Radial de Harada)', items: [
+            { label: 'Avenida / Rua', layer: 'setor', mode: 'buffer', radius: 200, situacao: 'ambas', count: 'domicilios' },
+            { label: 'Viaduto / Elevado', layer: 'setor', mode: 'buffer', radius: 200, situacao: 'ambas', count: 'domicilios' },
+            { label: 'Ciclovia', layer: 'setor', mode: 'buffer', radius: 200, situacao: 'ambas', count: 'domicilios' },
+            { label: 'Sinalização (avenida/rua/viaduto/ciclovia)', layer: 'setor', mode: 'buffer', radius: 200, situacao: 'ambas', count: 'domicilios' },
+        ]},
+        { group: 'Vias rurais (§4.2 — raio 2.000m / Índice de Acesso Rural, Banco Mundial)', items: [
+            { label: 'Estrada vicinal', layer: 'setor', mode: 'buffer', radius: 2000, situacao: 'rural', count: 'domicilios' },
+            { label: 'Passagem molhada', layer: 'setor', mode: 'buffer', radius: 2000, situacao: 'rural', count: 'domicilios' },
+            { label: 'Ponte (interliga comunidades)', layer: 'setor', mode: 'buffer', radius: 2000, situacao: 'rural', count: 'domicilios' },
+            { label: 'Sinalização (estrada vicinal)', layer: 'setor', mode: 'buffer', radius: 2000, situacao: 'rural', count: 'domicilios' },
+        ]},
+        { group: 'Rodovias e conexões intermunicipais (§4.3 — soma da população dos municípios interligados)', items: [
+            { label: 'Rodovia', layer: 'municipio', mode: 'manual', hint: 'Clique no mapa em cada município interligado pela rodovia para somar as populações.' },
+            { label: 'Contorno rodoviário', layer: 'municipio', mode: 'manual', hint: 'Clique nos municípios interligados pelo contorno.' },
+            { label: 'Ponte (interliga municípios)', layer: 'municipio', mode: 'manual', hint: 'Clique nos municípios interligados pela ponte.' },
+            { label: 'Sinalização (rodovia)', layer: 'municipio', mode: 'manual', hint: 'Clique nos municípios interligados pelo trecho sinalizado.' },
+            { label: 'Aeródromo', layer: 'municipio', mode: 'manual', hint: 'Alternativa: pólo/conjunto de municípios próximos — clique nos municípios de referência.' },
+            { label: 'Aeroporto', layer: 'municipio', mode: 'manual', hint: 'Alternativa: pólo/conjunto de municípios próximos — clique nos municípios de referência.' },
+            { label: 'Ferrovia', layer: 'municipio', mode: 'manual', hint: 'Clique nos municípios atendidos pela ferrovia.' },
+        ]},
+        { group: 'Equipamentos comunitários urbanos (§4.4 — raio 2.500m; Plano Diretor de Goiânia / CASTELLO 2013)', items: [
+            { label: 'Equipamento cultural', layer: 'setor', mode: 'buffer', radius: 2500, situacao: 'ambas', count: 'domicilios', hint: 'Se o município tiver menos de 20.000 habitantes, use "Por município" (população municipal inteira) em vez do raio.' },
+            { label: 'Espaço cidadania', layer: 'setor', mode: 'buffer', radius: 2500, situacao: 'ambas', count: 'domicilios', hint: 'Se o município tiver menos de 20.000 habitantes, use "Por município" em vez do raio.' },
+            { label: 'Prédio público', layer: 'setor', mode: 'buffer', radius: 2500, situacao: 'ambas', count: 'domicilios', hint: 'Se o município tiver menos de 20.000 habitantes, use "Por município" em vez do raio.' },
+            { label: 'Cemitério', layer: 'setor', mode: 'buffer', radius: 2500, situacao: 'ambas', count: 'domicilios', hint: 'Se o município tiver menos de 20.000 habitantes, use "Por município" em vez do raio.' },
+            { label: 'Matadouro', layer: 'setor', mode: 'buffer', radius: 2500, situacao: 'ambas', count: 'domicilios', hint: 'Se o município tiver menos de 20.000 habitantes, use "Por município" em vez do raio.' },
+            { label: 'Mercado público', layer: 'setor', mode: 'buffer', radius: 2500, situacao: 'ambas', count: 'domicilios', hint: 'Se o município tiver menos de 20.000 habitantes, use "Por município" em vez do raio.' },
+            { label: 'Unidade administrativa', layer: 'setor', mode: 'buffer', radius: 2500, situacao: 'ambas', count: 'domicilios', hint: 'Se o município tiver menos de 20.000 habitantes, use "Por município" em vez do raio.' },
+            { label: 'Pórtico', layer: 'setor', mode: 'buffer', radius: 2500, situacao: 'ambas', count: 'domicilios', hint: 'Se o município tiver menos de 20.000 habitantes, use "Por município" em vez do raio.' },
+        ]},
+        { group: 'Esporte, lazer e espaços públicos (§4.8)', items: [
+            { label: 'Praça de vizinhança', layer: 'setor', mode: 'buffer', radius: 600, situacao: 'ambas', count: 'domicilios', hint: 'Alternativa: 1 unidade / 10 mil habitantes.' },
+            { label: 'Quadra poliesportiva comunitária', layer: 'setor', mode: 'buffer', radius: 600, situacao: 'ambas', count: 'domicilios' },
+            { label: 'Parque de bairro', layer: 'setor', mode: 'buffer', radius: 2400, situacao: 'ambas', count: 'domicilios', hint: 'Alternativa: 1 unidade / 20.000 habitantes.' },
+            { label: 'Parque da cidade', layer: 'municipio', mode: 'municipio' },
+            { label: 'Passeio público (calçadão, canteiro central)', layer: 'setor', mode: 'buffer', radius: 600, situacao: 'ambas', count: 'domicilios' },
+            { label: 'Pista de cooper', layer: 'setor', mode: 'buffer', radius: 600, situacao: 'ambas', count: 'domicilios' },
+            { label: 'Orla', layer: 'setor', mode: 'buffer', radius: 600, situacao: 'ambas', count: 'domicilios' },
+            { label: 'Passarela', layer: 'setor', mode: 'buffer', radius: 600, situacao: 'ambas', count: 'domicilios' },
+            { label: 'Grandes equipamentos culturais', layer: 'municipio', mode: 'municipio', hint: 'Anexo não fixa raio — avalie caso a caso; alternativa próxima: Estádio (5km).' },
+            { label: 'Estádio', layer: 'municipio', mode: 'municipio', hint: 'Alternativa: raio de 5km em vez da população municipal inteira.' },
+        ]},
+        { group: 'Saúde (§4.8 — limiares populacionais / raio)', items: [
+            { label: 'Hospital regional (normal)', layer: 'municipio', mode: 'municipio', hint: 'Regra por limiar populacional, não geométrica: 200.000 habitantes. Confira a população do município selecionado.' },
+            { label: 'Centro de parto normal (especializado)', layer: 'municipio', mode: 'municipio', hint: 'Regra por limiar populacional: 50.000 habitantes.' },
+            { label: 'Hospital de base', layer: 'municipio', mode: 'municipio', hint: 'Regra por limiar populacional: 500.000 habitantes.' },
+            { label: 'Posto de saúde / UBS / UBAS', layer: 'setor', mode: 'buffer', radius: 8000, situacao: 'ambas', count: 'domicilios', hint: 'Alternativa: 3.000 habitantes.' },
+            { label: 'Centro de saúde', layer: 'setor', mode: 'buffer', radius: 5000, situacao: 'ambas', count: 'domicilios', hint: 'Alternativa: 30.000 habitantes.' },
+        ]},
+        { group: 'Segurança pública (§4.8 — população da AISPS, sem raio fixo)', items: [
+            { label: 'Delegacia da Polícia Civil', layer: 'municipio', mode: 'municipio', hint: 'Regra: população da Área Integrada de Segurança Pública (AISPS). Alternativa: 1 unidade / 50.000–100.000 hab. Sem dado de AISPS no app — use a população municipal como aproximação e documente na justificativa técnica.' },
+            { label: 'Companhia Independente da PM', layer: 'municipio', mode: 'municipio', hint: 'Regra: população da AISPS. Alternativa: 1 unidade / 200.000 hab. Use a população municipal como aproximação e documente na justificativa técnica.' },
+            { label: 'Batalhão do Corpo de Bombeiros', layer: 'municipio', mode: 'municipio', hint: 'Regra: população da AISPS. Alternativa: 1 unidade / 75.000 hab. Use a população municipal como aproximação e documente na justificativa técnica.' },
+            { label: 'Unidade prisional', layer: 'municipio', mode: 'municipio', hint: 'Anexo ainda não fixa regra (aguardando retorno do órgão). Alternativa sugerida: Nº de vagas × N — este app não calcula esse produto, informe no memorial de cálculo.' },
+        ]},
+        { group: 'Educação e habitação (§4.5 — nº de vagas × N)', items: [
+            { label: 'Unidade escolar (Ensino Médio)', layer: 'setor', mode: 'buffer', radius: 3000, situacao: 'ambas', count: 'domicilios', hint: 'Alternativa: Nº de vagas × N — não calculado automaticamente pelo app; informe no memorial de cálculo.' },
+            { label: 'Centro de ensino especial', layer: 'municipio', mode: 'municipio', hint: 'Alcance regional — avalie se a base "Por município" é suficiente ou se deve somar municípios vizinhos (modo Clique).' },
+            { label: 'Unidade habitacional', layer: 'setor', mode: 'buffer', situacao: 'ambas', count: 'domicilios', hint: 'Regra do anexo é Nº de vagas × N (N pode ser 3) — não calculado automaticamente pelo app; informe no memorial de cálculo.' },
+            { label: 'Universidade', layer: 'setor', mode: 'buffer', situacao: 'ambas', count: 'domicilios', hint: 'Regra do anexo é Nº de vagas × N — não calculado automaticamente pelo app; informe no memorial de cálculo.' },
+        ]},
+        { group: 'Redes e sistemas (§4.6 — raio 50m urbano / 200m rural)', items: [
+            { label: 'Rede de distribuição / sistema de abastecimento d’água', layer: 'setor', mode: 'buffer', radius: 50, situacao: 'ambas', count: 'domicilios', hint: 'Use 200m se a rede for em perímetro rural (troque o raio manualmente).' },
+            { label: 'Poço', layer: 'setor', mode: 'buffer', radius: 50, situacao: 'ambas', count: 'domicilios', hint: 'Use 200m se for em perímetro rural.' },
+            { label: 'Rede de esgoto / sistema de esgotamento sanitário', layer: 'setor', mode: 'buffer', radius: 50, situacao: 'ambas', count: 'domicilios', hint: 'Use 200m se for em perímetro rural.' },
+            { label: 'Drenagem / bueiro', layer: 'setor', mode: 'buffer', radius: 50, situacao: 'ambas', count: 'domicilios', hint: 'Anexo sugere área do polígono × domicílios; use "Polígono importado (KML/KMZ)" quando houver área definida, em vez de raio fixo.' },
+            { label: 'Rede de energia elétrica / iluminação', layer: 'setor', mode: 'buffer', radius: 50, situacao: 'ambas', count: 'domicilios', hint: 'Use 200m se for em perímetro rural.' },
+        ]},
+        { group: 'Barragens e projetos específicos', items: [
+            { label: 'Barragem / açude', layer: null, mode: null, hint: 'Use a aba "Impacto de Barragens" deste app (trecho a montante/jusante) — ver §4.7 do Anexo II. Sugestão do anexo: 3km a montante do espelho d’água e faixa de 500m por margem (1km total) a jusante.' },
+            { label: 'Adutora', layer: 'municipio', mode: 'manual', hint: 'PDB = população total das comunidades/sedes municipais conectadas. Clique nos municípios atendidos.' },
+            { label: 'Terminal rodoviário', layer: 'municipio', mode: 'municipio' },
+            { label: 'Cisterna / dique / sistema de irrigação / terminal turístico / porto / energia solar / elaboração de projeto', layer: null, mode: null, hint: 'Projeto específico — o anexo não fixa regra geométrica; construa o memorial de cálculo caso a caso com a setorial responsável.' },
+        ]},
+    ];
+
+    const tipologiaSelect = document.getElementById('tipologiaSelect');
+    const tipologiaHint = document.getElementById('tipologiaHint');
+    (function buildTipologiaOptions() {
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Selecione a tipologia da obra…';
+        tipologiaSelect.appendChild(placeholder);
+        TIPOLOGIAS.forEach((grp, gi) => {
+            const og = document.createElement('optgroup');
+            og.label = grp.group;
+            grp.items.forEach((item, ii) => {
+                const opt = document.createElement('option');
+                opt.value = gi + ':' + ii;
+                opt.textContent = item.label;
+                og.appendChild(opt);
+            });
+            tipologiaSelect.appendChild(og);
+        });
+    })();
+
+    function setRadioValue(name, value) {
+        const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
+        if (radio && !radio.checked) {
+            radio.checked = true;
+            radio.dispatchEvent(new Event('change'));
+        }
+    }
+
+    function setSituacaoPreset(preset) {
+        // preset: 'ambas' | 'rural' | 'urbano'
+        const wantUrbano = (preset !== 'rural');
+        const wantRural = (preset !== 'urbano');
+        const cbUrbano = document.querySelector('#situacaoCheckboxes input[value="urbano"]');
+        const cbRural = document.querySelector('#situacaoCheckboxes input[value="rural"]');
+        [[cbUrbano, wantUrbano], [cbRural, wantRural]].forEach(([cb, want]) => {
+            if (cb && cb.checked !== want) {
+                cb.checked = want;
+                cb.dispatchEvent(new Event('change'));
+            }
+        });
+    }
+
+    tipologiaSelect.addEventListener('change', (e) => {
+        if (!e.target.value) {
+            tipologiaHint.style.display = 'none';
+            return;
+        }
+        const [gi, ii] = e.target.value.split(':').map(Number);
+        const item = TIPOLOGIAS[gi].items[ii];
+
+        if (item.layer === null) {
+            // Sem regra geométrica automática (barragem/projeto específico): só exibe a orientação.
+            tipologiaHint.innerHTML = '⚠️ ' + item.hint;
+            tipologiaHint.style.display = 'block';
+            return;
+        }
+
+        if (item.layer !== currentLayerKey) {
+            layerSelect.value = item.layer;
+            loadLayer(item.layer);
+        }
+        setRadioValue('analysisModeRadio', item.mode);
+        if (item.mode === 'buffer') {
+            if (typeof item.radius === 'number' && radiusInput.value != String(item.radius)) {
+                radiusInput.value = item.radius;
+                radiusInput.dispatchEvent(new Event('change'));
+            }
+            if (item.situacao) setSituacaoPreset(item.situacao);
+            if (item.count) setRadioValue('countMethodRadio', item.count);
+        }
+
+        let hintHtml = `Preset aplicado: <strong>${item.label}</strong>.`;
+        if (item.hint) hintHtml += ' ' + item.hint;
+        tipologiaHint.innerHTML = hintHtml;
+        tipologiaHint.style.display = 'block';
     });
 
     // ============================================================
