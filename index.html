@@ -517,29 +517,45 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
 }
 
 /* ===== Créditos ===== */
-.credits {
-    max-width: 1400px;
-    margin: 20px auto 0;
-    padding: 16px 20px;
-    background: var(--card);
+.topbar-right-group { gap: 18px; }
+.credits-btn {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    color: var(--teal-dark);
+    background: var(--teal-pale);
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: 20px;
+    padding: 6px 12px;
+    cursor: pointer;
+}
+.credits-btn:hover { background: var(--teal); color: #fff; }
+.credits-overlay {
+    position: fixed; inset: 0; z-index: 10000;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(15,30,30,.45); padding: 16px;
+}
+.credits-overlay.open { display: flex; }
+.credits-modal {
+    position: relative; width: 100%; max-width: 380px;
+    background: var(--card); border-radius: 12px; padding: 22px;
+    box-shadow: 0 20px 50px rgba(15,30,30,.3);
+}
+.credits-close {
+    position: absolute; top: 8px; right: 12px;
+    background: none; border: 0; font-size: 24px; line-height: 1;
+    color: var(--muted); cursor: pointer;
 }
 .credits-title {
     font-family: var(--font-display);
-    font-size: 13px;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--teal-dark);
-    margin-bottom: 10px;
+    font-size: 13px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--teal-dark); margin-bottom: 12px;
 }
-.credits-grid { display: flex; flex-wrap: wrap; gap: 12px; }
 .credit-card {
-    flex: 1 1 220px;
-    padding: 10px 14px;
-    background: var(--paper);
-    border-left: 3px solid var(--teal);
-    border-radius: 6px;
+    padding: 10px 14px; margin-top: 10px;
+    background: var(--paper); border-left: 3px solid var(--teal); border-radius: 6px;
 }
 .credit-role { font-size: 12px; font-weight: 600; color: var(--muted); }
 .credit-name { font-size: 15px; font-weight: 600; color: var(--ink); margin-top: 2px; }
@@ -562,6 +578,7 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
         </div>
     </div>
     <div class="topbar-right-group">
+        <button type="button" class="credits-btn" id="creditsBtn">Créditos</button>
         <div class="dima-lockup">
             <div class="dima-word">DIMA</div>
             <div class="dima-sub">Diretoria de Monitoramento de Ações</div>
@@ -877,9 +894,10 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     </div>
 </div>
 
-<footer class="credits">
-    <h3 class="credits-title">Créditos</h3>
-    <div class="credits-grid">
+<div class="credits-overlay" id="creditsOverlay">
+    <div class="credits-modal" role="dialog" aria-modal="true" aria-labelledby="creditsTitle">
+        <button type="button" class="credits-close" id="creditsClose" aria-label="Fechar">&times;</button>
+        <h3 class="credits-title" id="creditsTitle">Créditos</h3>
         <div class="credit-card">
             <div class="credit-role">Desenvolvimento</div>
             <div class="credit-name">Tom Munique</div>
@@ -889,7 +907,17 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
             <div class="credit-name">Renan Javian</div>
         </div>
     </div>
-</footer>
+</div>
+<script>
+(function () {
+    const ov = document.getElementById('creditsOverlay');
+    const close = () => ov.classList.remove('open');
+    document.getElementById('creditsBtn').addEventListener('click', () => ov.classList.add('open'));
+    document.getElementById('creditsClose').addEventListener('click', close);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+})();
+</script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
