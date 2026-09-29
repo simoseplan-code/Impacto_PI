@@ -516,6 +516,34 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     .dima-sub { display: none; }
 }
 
+/* ===== Créditos ===== */
+.credits {
+    max-width: 1400px;
+    margin: 20px auto 0;
+    padding: 16px 20px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+}
+.credits-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--teal-dark);
+    margin-bottom: 10px;
+}
+.credits-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+.credit-card {
+    flex: 1 1 220px;
+    padding: 10px 14px;
+    background: var(--paper);
+    border-left: 3px solid var(--teal);
+    border-radius: 6px;
+}
+.credit-role { font-size: 12px; font-weight: 600; color: var(--muted); }
+.credit-name { font-size: 15px; font-weight: 600; color: var(--ink); margin-top: 2px; }
+
     </style>
 </head>
 <body>
@@ -849,6 +877,19 @@ table.unit-table .unit-more td { text-align: center; font-style: italic; color: 
     </div>
 </div>
 
+<footer class="credits">
+    <h3 class="credits-title">Créditos</h3>
+    <div class="credits-grid">
+        <div class="credit-card">
+            <div class="credit-role">Desenvolvimento</div>
+            <div class="credit-name">Tom Munique</div>
+        </div>
+        <div class="credit-card">
+            <div class="credit-role">Apoio</div>
+            <div class="credit-name">Renan Javian</div>
+        </div>
+    </div>
+</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
